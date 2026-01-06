@@ -40,8 +40,11 @@ const PluginType = "response_matcher"
 func init() {
 	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
 
-	coremain.RegNewPersetPluginFunc("_response_valid_answer", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPersetPluginFunc("_valid_answer", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &hasValidAnswer{BP: bp}, nil
+	})
+	coremain.RegNewPersetPluginFunc("_empty_ip_answer", func(bp *coremain.BP) (coremain.Plugin, error) {
+		return &hasEmptyIPAnswer{BP: bp}, nil
 	})
 }
 
@@ -129,7 +132,7 @@ func (e *hasValidAnswer) match(qCtx *query_context.Context) (matched bool) {
 		qType  uint16
 		qClass uint16
 	}
-	
+
 	switch q.Question[0].Qtype {
 	case dns.TypeA, dns.TypeAAAA:
 		m := make(map[question]struct{}, len(q.Question))
@@ -151,5 +154,32 @@ func (e *hasValidAnswer) match(qCtx *query_context.Context) (matched bool) {
 }
 
 func (e *hasValidAnswer) Match(_ context.Context, qCtx *query_context.Context) (matched bool, err error) {
+	return e.match(qCtx), nil
+}
+
+type hasEmptyIPAnswer struct {
+	*coremain.BP
+}
+
+var _ coremain.MatcherPlugin = (*hasEmptyIPAnswer)(nil)
+
+func (e *hasEmptyIPAnswer) match(qCtx *query_context.Context) (matched bool) {
+	r := qCtx.R()
+	if r == nil {
+		return false
+	}
+
+	q := qCtx.Q()
+
+	switch q.Question[0].Qtype {
+	case dns.TypeA, dns.TypeAAAA:
+		if len(r.Answer) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *hasEmptyIPAnswer) Match(_ context.Context, qCtx *query_context.Context) (matched bool, err error) {
 	return e.match(qCtx), nil
 }
