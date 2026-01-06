@@ -321,6 +321,7 @@ func SelectFastestUpstream(upstreams []Upstream) (Upstream, error) {
 	q := new(dns.Msg)
 	q.SetQuestion("example.com.", dns.TypeA)
 
+	var once sync.Once
 	for _, u := range upstreams {
 		wg.Add(1)
 		u := u
@@ -343,7 +344,7 @@ func SelectFastestUpstream(upstreams []Upstream) (Upstream, error) {
 
 			select {
 			case resultCh <- u:
-				close(finish)
+				once.Do(func() { close(finish) })
 			case <-finish:
 			}
 		}()

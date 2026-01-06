@@ -60,21 +60,21 @@ type Args struct {
 }
 
 type UpstreamConfig struct {
-	Addr           string `yaml:"addr"` // required
-	DialAdders       []string `yaml:"dial_addr"`
-	Trusted        bool   `yaml:"trusted"`
-	Socks5         string `yaml:"socks5"`
-	S5Username     string `yaml:"s5_username"`
-	S5Password     string `yaml:"s5_password"`
-	SoMark         int    `yaml:"so_mark"`
-	BindToDevice   string `yaml:"bind_to_device"`
-	IdleTimeout    int    `yaml:"idle_timeout"`
-	MaxConns       int    `yaml:"max_conns"`
-	EnablePipeline bool   `yaml:"enable_pipeline"`
-	Bootstrap      string `yaml:"bootstrap"`
-	Insecure       bool   `yaml:"insecure"`
-	KernelTX       bool   `yaml:"kernel_tx"` // use kernel tls to send data
-	KernelRX       bool   `yaml:"kernel_rx"` // use kernel tls to receive data
+	Addr           string   `yaml:"addr"` // required
+	DialAdders     []string `yaml:"dial_addr"`
+	Trusted        bool     `yaml:"trusted"`
+	Socks5         string   `yaml:"socks5"`
+	S5Username     string   `yaml:"s5_username"`
+	S5Password     string   `yaml:"s5_password"`
+	SoMark         int      `yaml:"so_mark"`
+	BindToDevice   string   `yaml:"bind_to_device"`
+	IdleTimeout    int      `yaml:"idle_timeout"`
+	MaxConns       int      `yaml:"max_conns"`
+	EnablePipeline bool     `yaml:"enable_pipeline"`
+	Bootstrap      string   `yaml:"bootstrap"`
+	Insecure       bool     `yaml:"insecure"`
+	KernelTX       bool     `yaml:"kernel_tx"` // use kernel tls to send data
+	KernelRX       bool     `yaml:"kernel_rx"` // use kernel tls to receive data
 }
 
 func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
@@ -116,7 +116,10 @@ func newFastForward(bp *coremain.BP, args *Args) (*fastForward, error) {
 		}
 
 		var upstreams []upstream.Upstream
-
+		dialAdders := c.DialAdders
+		if len(dialAdders) == 0 {
+			dialAdders = []string{""}
+		}
 		for _, addr := range c.DialAdders {
 			opt := &upstream.Opt{
 				DialAddr:       addr,
