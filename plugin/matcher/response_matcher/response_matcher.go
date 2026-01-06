@@ -124,21 +124,27 @@ func (e *hasValidAnswer) match(qCtx *query_context.Context) (matched bool) {
 	}
 
 	q := qCtx.Q()
-	m := make(map[dns.Question]struct{})
-	for _, question := range q.Question {
-		m[question] = struct{}{}
-	}
 
-	for _, rr := range r.Answer {
-		h := rr.Header()
-		q := dns.Question{
-			Name:   h.Name,
-			Qtype:  h.Rrtype,
-			Qclass: h.Class,
+	type question struct {
+		qType  uint16
+		qClass uint16
+	}
+	
+	switch q.Question[0].Qtype {
+	case dns.TypeA, dns.TypeAAAA:
+		m := make(map[question]struct{}, len(q.Question))
+		for _, quest := range q.Question {
+			m[question{quest.Qtype, quest.Qclass}] = struct{}{}
 		}
-		if _, ok := m[q]; ok {
-			return true
+		for _, rr := range r.Answer {
+			h := rr.Header()
+			q := question{h.Rrtype, h.Class}
+			if _, ok := m[q]; ok {
+				return true
+			}
 		}
+	default:
+		return r.Rcode == dns.RcodeSuccess
 	}
 
 	return false

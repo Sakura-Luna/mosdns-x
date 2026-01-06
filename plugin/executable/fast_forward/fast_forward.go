@@ -61,7 +61,7 @@ type Args struct {
 
 type UpstreamConfig struct {
 	Addr           string `yaml:"addr"` // required
-	DialAddr       string `yaml:"dial_addr"`
+	DialAdders       []string `yaml:"dial_addr"`
 	Trusted        bool   `yaml:"trusted"`
 	Socks5         string `yaml:"socks5"`
 	S5Username     string `yaml:"s5_username"`
@@ -115,29 +115,38 @@ func newFastForward(bp *coremain.BP, args *Args) (*fastForward, error) {
 			continue
 		}
 
-		opt := &upstream.Opt{
-			DialAddr:       c.DialAddr,
-			Socks5:         c.Socks5,
-			S5Username:     c.S5Username,
-			S5Password:     c.S5Password,
-			SoMark:         c.SoMark,
-			BindToDevice:   c.BindToDevice,
-			IdleTimeout:    time.Duration(c.IdleTimeout) * time.Second,
-			MaxConns:       c.MaxConns,
-			EnablePipeline: c.EnablePipeline,
-			Bootstrap:      c.Bootstrap,
-			Insecure:       c.Insecure,
-			RootCAs:        rootCAs,
-			KernelTX:       c.KernelTX,
-			KernelRX:       c.KernelRX,
-			Logger:         bp.L(),
+		var upstreams []upstream.Upstream
+
+		for _, addr := range c.DialAdders {
+			opt := &upstream.Opt{
+				DialAddr:       addr,
+				Socks5:         c.Socks5,
+				S5Username:     c.S5Username,
+				S5Password:     c.S5Password,
+				SoMark:         c.SoMark,
+				BindToDevice:   c.BindToDevice,
+				IdleTimeout:    time.Duration(c.IdleTimeout) * time.Second,
+				MaxConns:       c.MaxConns,
+				EnablePipeline: c.EnablePipeline,
+				Bootstrap:      c.Bootstrap,
+				Insecure:       c.Insecure,
+				RootCAs:        rootCAs,
+				KernelTX:       c.KernelTX,
+				KernelRX:       c.KernelRX,
+				Logger:         bp.L(),
+			}
+
+			u, err := upstream.NewUpstream(c.Addr, opt)
+			if err != nil {
+				return nil, fmt.Errorf("failed to init upstream: %w", err)
+			}
+			upstreams = append(upstreams, u)
 		}
 
-		u, err := upstream.NewUpstream(c.Addr, opt)
+		u, err := upstream.SelectFastestUpstream(upstreams)
 		if err != nil {
-			return nil, fmt.Errorf("failed to init upstream: %w", err)
+			return nil, fmt.Errorf("failed to create upstream, because: %w", err)
 		}
-
 		w := &upstreamWrapper{
 			address: c.Addr,
 			trusted: c.Trusted,
