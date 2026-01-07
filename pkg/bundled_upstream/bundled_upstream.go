@@ -40,6 +40,7 @@ type Upstream interface {
 	Trusted() bool
 
 	Address() string
+	IPAddress() string
 }
 
 type parallelResult struct {
@@ -81,7 +82,11 @@ func ExchangeParallel(ctx context.Context, qCtx *query_context.Context, upstream
 		select {
 		case res := <-c:
 			if res.err != nil {
-				logger.Warn("upstream err", qCtx.InfoField(), zap.String("addr", res.from.Address()))
+				msg := []zap.Field{qCtx.InfoField(), zap.String("addr", res.from.Address())}
+				if ip := res.from.IPAddress(); ip != "" {
+					msg = append(msg, zap.String("ip", ip))
+				}
+				logger.Warn("upstream err", msg...)
 				continue
 			}
 

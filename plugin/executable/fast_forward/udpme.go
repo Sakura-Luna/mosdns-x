@@ -45,6 +45,10 @@ func (u *udpmeUpstream) Address() string {
 	return u.addr
 }
 
+func (u *udpmeUpstream) IPAddress() string {
+	return ""
+}
+
 func (u *udpmeUpstream) Trusted() bool {
 	return u.trusted
 }

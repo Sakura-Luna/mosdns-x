@@ -145,13 +145,15 @@ func newFastForward(bp *coremain.BP, args *Args) (*fastForward, error) {
 			}
 			upstreams = append(upstreams, u)
 		}
-		u, err := upstream.SelectFastestUpstream(upstreams)
+		k, err := upstream.SelectFastestUpstream(upstreams)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create upstream, because: %w", err)
 		}
+		u := upstreams[k]
 
 		w := &upstreamWrapper{
 			address: c.Addr,
+			ipAddr:  dialAdders[k],
 			trusted: c.Trusted,
 			u:       u,
 		}
@@ -169,6 +171,7 @@ func newFastForward(bp *coremain.BP, args *Args) (*fastForward, error) {
 
 type upstreamWrapper struct {
 	address string
+	ipAddr  string
 	trusted bool
 	u       upstream.Upstream
 }
@@ -180,6 +183,10 @@ func (u *upstreamWrapper) Exchange(ctx context.Context, q *dns.Msg) (*dns.Msg, e
 
 func (u *upstreamWrapper) Address() string {
 	return u.address
+}
+
+func (u *upstreamWrapper) IPAddress() string {
+	return u.ipAddr
 }
 
 func (u *upstreamWrapper) Trusted() bool {

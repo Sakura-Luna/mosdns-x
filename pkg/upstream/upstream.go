@@ -306,12 +306,12 @@ func NewUpstream(addr string, opt *Opt) (Upstream, error) {
 	}
 }
 
-func SelectFastestUpstream(upstreams []Upstream) (Upstream, error) {
+func SelectFastestUpstream(upstreams []Upstream) (int, error) {
 	if len(upstreams) == 1 {
-		return upstreams[0], nil
+		return 0, nil
 	}
 	var wg sync.WaitGroup
-	resultCh := make(chan Upstream, 1)
+	resultCh := make(chan int, 1)
 	errCh := make(chan error, len(upstreams))
 	finish := make(chan struct{})
 
@@ -319,8 +319,9 @@ func SelectFastestUpstream(upstreams []Upstream) (Upstream, error) {
 	q.SetQuestion("example.com.", dns.TypeA)
 
 	var once sync.Once
-	for _, u := range upstreams {
+	for i, u := range upstreams {
 		wg.Add(1)
+		i := i
 		u := u
 
 		go func() {
@@ -340,7 +341,7 @@ func SelectFastestUpstream(upstreams []Upstream) (Upstream, error) {
 			}
 
 			select {
-			case resultCh <- u:
+			case resultCh <- i:
 				once.Do(func() { close(finish) })
 			case <-finish:
 			}
@@ -360,11 +361,11 @@ func SelectFastestUpstream(upstreams []Upstream) (Upstream, error) {
 			for err := range errCh {
 				allErrs = append(allErrs, err)
 			}
-			return nil, fmt.Errorf("all upstreams failed: %v", allErrs)
+			return -1, fmt.Errorf("all upstreams failed: %v", allErrs)
 		}
 		return fastestUpstream, nil
 	case <-time.After(3 * time.Second):
-		return nil, errors.New("timeout waiting for upstreams")
+		return -1, errors.New("timeout waiting for upstreams")
 	}
 }
 

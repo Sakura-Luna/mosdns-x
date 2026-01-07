@@ -39,12 +39,16 @@ func init() {
 	coremain.RegNewPersetPluginFunc("_query_summary", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newLogger(bp, &Args{}), nil
 	})
+	coremain.RegNewPersetPluginFunc("_query_summary_extend", func(bp *coremain.BP) (coremain.Plugin, error) {
+		return newLogger(bp, &Args{Client: true}), nil
+	})
 }
 
 var _ coremain.ExecutablePlugin = (*logger)(nil)
 
 type Args struct {
-	Msg string `yaml:"msg"`
+	Msg    string `yaml:"msg"`
+	Client bool   `yaml:"client"`
 }
 
 func (a *Args) init() {
@@ -81,14 +85,15 @@ func (l *logger) Exec(ctx context.Context, qCtx *C.Context, next executable_seq.
 		respRcode = r.Rcode
 	}
 
-	inboundInfo := []zap.Field{
-		zap.Uint32("uqid", qCtx.Id()),
-		zap.Stringer("client", qCtx.ReqMeta().GetClientAddr()),
-		zap.String("protocol", qCtx.ReqMeta().GetProtocol()),
-	}
-	switch qCtx.ReqMeta().GetProtocol() {
-	case C.ProtocolHTTPS, C.ProtocolH2, C.ProtocolH3, C.ProtocolQUIC, C.ProtocolTLS:
-		inboundInfo = append(inboundInfo, zap.String("server_name", qCtx.ReqMeta().GetServerName()))
+	inboundInfo := []zap.Field{zap.Uint32("uqid", qCtx.Id())}
+	if l.args.Client {
+		inboundInfo = append(inboundInfo,
+			zap.Stringer("client", qCtx.ReqMeta().GetClientAddr()),
+			zap.String("protocol", qCtx.ReqMeta().GetProtocol()))
+		switch qCtx.ReqMeta().GetProtocol() {
+		case C.ProtocolHTTPS, C.ProtocolH2, C.ProtocolH3, C.ProtocolQUIC, C.ProtocolTLS:
+			inboundInfo = append(inboundInfo, zap.String("server_name", qCtx.ReqMeta().GetServerName()))
+		}
 	}
 	l.BP.L().Info(
 		l.args.Msg,
