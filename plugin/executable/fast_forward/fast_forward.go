@@ -115,12 +115,12 @@ func newFastForward(bp *coremain.BP, args *Args) (*fastForward, error) {
 			continue
 		}
 
-		var upstreams []upstream.Upstream
 		dialAdders := c.DialAdders
 		if len(dialAdders) == 0 {
 			dialAdders = []string{""}
 		}
-		for _, addr := range c.DialAdders {
+		upstreams := make([]upstream.Upstream, 0, len(dialAdders))
+		for _, addr := range dialAdders {
 			opt := &upstream.Opt{
 				DialAddr:       addr,
 				Socks5:         c.Socks5,
@@ -145,11 +145,11 @@ func newFastForward(bp *coremain.BP, args *Args) (*fastForward, error) {
 			}
 			upstreams = append(upstreams, u)
 		}
-
 		u, err := upstream.SelectFastestUpstream(upstreams)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create upstream, because: %w", err)
 		}
+
 		w := &upstreamWrapper{
 			address: c.Addr,
 			trusted: c.Trusted,

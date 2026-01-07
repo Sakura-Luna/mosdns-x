@@ -307,10 +307,7 @@ func NewUpstream(addr string, opt *Opt) (Upstream, error) {
 }
 
 func SelectFastestUpstream(upstreams []Upstream) (Upstream, error) {
-	switch len(upstreams) {
-	case 0:
-		return nil, fmt.Errorf("no upstreams available")
-	case 1:
+	if len(upstreams) == 1 {
 		return upstreams[0], nil
 	}
 	var wg sync.WaitGroup
