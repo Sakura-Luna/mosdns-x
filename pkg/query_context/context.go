@@ -104,6 +104,7 @@ type Context struct {
 	reqMeta       *RequestMeta
 
 	r     *dns.Msg
+	from  string
 	marks map[uint]struct{}
 }
 
@@ -179,11 +180,18 @@ func (ctx *Context) R() *dns.Msg {
 	return ctx.r
 }
 
+func (ctx *Context) From() string { return ctx.from }
+
 // SetResponse stores the response r to the context.
 // Note: It just stores the pointer of r. So the caller
 // shouldn't modify or read r after the call.
 func (ctx *Context) SetResponse(r *dns.Msg) {
 	ctx.r = r
+}
+
+func (ctx *Context) SetFrom(f string) {
+	// fmt.Printf("Set From: {%+v} at %+v -> Answer: %+v\n", ctx.from, &ctx, ctx.r != nil)
+	ctx.from = f
 }
 
 // Id returns the Context id.

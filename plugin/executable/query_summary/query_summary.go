@@ -21,6 +21,7 @@ package query_summary
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -37,10 +38,13 @@ const (
 func init() {
 	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(*Args) })
 	coremain.RegNewPersetPluginFunc("_query_summary", func(bp *coremain.BP) (coremain.Plugin, error) {
+		return newLogger(bp, &Args{Source: true}), nil
+	})
+	coremain.RegNewPersetPluginFunc("_simple_summary", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newLogger(bp, &Args{}), nil
 	})
 	coremain.RegNewPersetPluginFunc("_query_summary_extend", func(bp *coremain.BP) (coremain.Plugin, error) {
-		return newLogger(bp, &Args{Client: true}), nil
+		return newLogger(bp, &Args{Source: true, Client: true}), nil
 	})
 }
 
@@ -48,12 +52,20 @@ var _ coremain.ExecutablePlugin = (*logger)(nil)
 
 type Args struct {
 	Msg    string `yaml:"msg"`
+	Source bool   `yaml:"source"`
 	Client bool   `yaml:"client"`
 }
 
 func (a *Args) init() {
 	if len(a.Msg) == 0 {
-		a.Msg = "query summary"
+		switch {
+		case a.Source && a.Client:
+			a.Msg = "full"
+		case !a.Source && !a.Client:
+			a.Msg = "simple"
+		default:
+			a.Msg = "normal"
+		}
 	}
 }
 
@@ -95,15 +107,29 @@ func (l *logger) Exec(ctx context.Context, qCtx *C.Context, next executable_seq.
 			inboundInfo = append(inboundInfo, zap.String("server_name", qCtx.ReqMeta().GetServerName()))
 		}
 	}
-	l.BP.L().Info(
-		l.args.Msg,
-		append(inboundInfo,
-			zap.String("qname", question.Name),
-			zap.Uint16("qtype", question.Qtype),
-			zap.Uint16("qclass", question.Qclass),
-			zap.Int("resp_rcode", respRcode),
-			zap.Duration("elapsed", time.Since(qCtx.StartTime())),
-			zap.Error(err))...,
-	)
+	inboundInfo = append(inboundInfo,
+		zap.String("qname", question.Name),
+		zap.Uint16("qtype", question.Qtype),
+		zap.Uint16("qclass", question.Qclass),
+		zap.Int("resp_rcode", respRcode),
+		zap.Duration("elapsed", time.Since(qCtx.StartTime())))
+
+	var reason string
+	switch info := qCtx.From(); {
+	case info == "" && err == nil:
+		reason = "terminate prematurely"
+	case info != "" && l.args.Source:
+		inboundInfo = append(inboundInfo, zap.String("source", info))
+	}
+	if err != nil && strings.HasSuffix(err.Error(), "canceled") {
+		reason = "canceled by others"
+		err = nil
+	}
+	if err != nil {
+		inboundInfo = append(inboundInfo, zap.String("reason", err.Error()))
+	} else if l.args.Source && reason != "" {
+		inboundInfo = append(inboundInfo, zap.String("reason", reason))
+	}
+	l.BP.L().Info(l.args.Msg, inboundInfo...)
 	return err
 }

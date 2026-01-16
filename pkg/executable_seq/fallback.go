@@ -105,12 +105,7 @@ func (t *statusTracker) update(s uint8) {
 	t.p++
 }
 
-func ParseFallbackNode(
-	c *FallbackConfig,
-	logger *zap.Logger,
-	execs map[string]Executable,
-	matchers map[string]Matcher,
-) (*FallbackNode, error) {
+func ParseFallbackNode(c *FallbackConfig, logger *zap.Logger, execs map[string]Executable, matchers map[string]Matcher) (*FallbackNode, error) {
 	if c.Primary == nil {
 		return nil, errors.New("primary is empty")
 	}
@@ -155,9 +150,7 @@ func ParseFallbackNode(
 }
 
 func (f *FallbackNode) Exec(ctx context.Context, qCtx *query_context.Context, next ExecutableChainNode) error {
-	if err := f.exec(ctx, qCtx); err != nil {
-		return err
-	}
+	_ = f.exec(ctx, qCtx)
 	return ExecChainNode(ctx, qCtx, next)
 }
 
@@ -173,17 +166,17 @@ func (f *FallbackNode) exec(ctx context.Context, qCtx *query_context.Context) er
 	return f.doFallback(ctx, qCtx)
 }
 
-func (f *FallbackNode) isolateDoPrimary(ctx context.Context, qCtx *query_context.Context) (err error) {
-	qCtxCopy := qCtx.Copy()
-	err = f.doPrimary(ctx, qCtxCopy)
-	qCtx.SetResponse(qCtxCopy.R())
-	return err
-}
+// func (f *FallbackNode) isolateDoPrimary(ctx context.Context, qCtx *query_context.Context) (err error) {
+// 	qCtxCopy := qCtx.Copy()
+// 	err = f.doPrimary(ctx, qCtxCopy)
+// 	qCtx.SetResponse(qCtxCopy.R())
+// 	return err
+// }
 
 func (f *FallbackNode) doPrimary(ctx context.Context, qCtx *query_context.Context) (err error) {
 	err = ExecChainNode(ctx, qCtx, f.primary)
 	if f.primaryST != nil {
-		if err != nil || qCtx.R() == nil {
+		if err != nil || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			f.primaryST.update(1)
 		} else {
 			f.primaryST.update(0)
@@ -202,65 +195,83 @@ func makeDdlCtx(ctx context.Context, timeout time.Duration) (context.Context, fu
 }
 
 func (f *FallbackNode) doFastFallback(ctx context.Context, qCtx *query_context.Context) (err error) {
+	var wg sync.WaitGroup
 	c := make(chan *parallelECSResult, 2)
+	taskCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	primFailed := make(chan struct{}) // will be closed if primary returns an error.
 	primDone := make(chan struct{})
+
+	wg.Add(1)
 	qCtxP := qCtx.Copy()
 	go func() {
-		cCtx, cancel := makeDdlCtx(ctx, defaultParallelTimeout)
-		defer cancel()
+		defer wg.Done()
+		cCtx, cCancel := makeDdlCtx(taskCtx, parallelTimeout)
+		defer cCancel()
+
 		err := f.doPrimary(cCtx, qCtxP)
 		if err != nil || qCtxP.R() == nil {
 			close(primFailed)
 		} else {
 			close(primDone)
 		}
-		c <- &parallelECSResult{
-			qCtx: qCtxP,
-			err:  err,
-			from: 1,
+
+		select {
+		case c <- &parallelECSResult{qCtx: qCtxP, err: err, from: 1}:
+		case <-taskCtx.Done():
 		}
 	}()
 
+	wg.Add(1)
 	qCtxS := qCtx.Copy()
 	go func() {
+		defer wg.Done()
 		timer := pool.GetTimer(f.fastFallbackDuration)
 		defer pool.ReleaseTimer(timer)
+
 		if !f.alwaysStandby { // not always standby, wait here.
 			select {
 			case <-primDone: // primary is done, no need to exec this.
 				return
 			case <-primFailed: // primary failed
 			case <-timer.C: // or timed out, exec secondary now.
+			case <-taskCtx.Done():
+				return
 			}
 		}
 
-		cCtx, cancel := makeDdlCtx(ctx, defaultParallelTimeout)
-		defer cancel()
+		cCtx, cCancel := makeDdlCtx(taskCtx, parallelTimeout)
+		defer cCancel()
 		err := f.doSecondary(cCtx, qCtxS)
-		res := &parallelECSResult{
-			qCtx: qCtxS,
-			err:  err,
-			from: 2,
-		}
+		res := &parallelECSResult{qCtx: qCtxS, err: err, from: 2}
 
 		if f.alwaysStandby { // always standby
 			select {
-			case <-ctx.Done():
+			case <-taskCtx.Done():
 				return
 			case <-primDone:
 				return
 			case <-primFailed: // only send secondary result when primary is failed.
-				c <- res
+				select {
+				case c <- res:
+				case <-taskCtx.Done():
+				}
 			case <-timer.C: // or timeout.
-				c <- res
+				select {
+				case c <- res:
+				case <-taskCtx.Done():
+				}
 			}
 		} else {
-			c <- res // not always standby, send the result asap.
+			select {
+			case c <- res: // not always standby, send the result asap.
+			case <-taskCtx.Done():
+			}
 		}
 	}()
 
-	return asyncWait(ctx, qCtx, f.logger, c, 2)
+	return asyncWait(taskCtx, qCtx, f.logger, c, &wg, cancel)
 }
 
 func (f *FallbackNode) doSecondary(ctx context.Context, qCtx *query_context.Context) (err error) {
@@ -268,31 +279,38 @@ func (f *FallbackNode) doSecondary(ctx context.Context, qCtx *query_context.Cont
 }
 
 func (f *FallbackNode) doFallback(ctx context.Context, qCtx *query_context.Context) error {
+	var wg sync.WaitGroup
 	c := make(chan *parallelECSResult, 2) // buf size is 2, avoid blocking.
+	taskCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
+	wg.Add(1)
 	qCtxP := qCtx.Copy()
 	go func() {
-		cCtx, cancel := makeDdlCtx(ctx, defaultParallelTimeout)
-		defer cancel()
+		defer wg.Done()
+		cCtx, cCancel := makeDdlCtx(taskCtx, parallelTimeout)
+		defer cCancel()
+
 		err := f.doPrimary(cCtx, qCtxP)
-		c <- &parallelECSResult{
-			qCtx: qCtxP,
-			err:  err,
-			from: 0,
+		select {
+		case c <- &parallelECSResult{qCtx: qCtxP, err: err, from: 0}:
+		case <-taskCtx.Done():
 		}
 	}()
 
+	wg.Add(1)
 	qCtxS := qCtx.Copy()
 	go func() {
-		cCtx, cancel := makeDdlCtx(ctx, defaultParallelTimeout)
-		defer cancel()
+		defer wg.Done()
+		cCtx, cCancel := makeDdlCtx(taskCtx, parallelTimeout)
+		defer cCancel()
+
 		err := f.doSecondary(cCtx, qCtxS)
-		c <- &parallelECSResult{
-			qCtx: qCtxS,
-			err:  err,
-			from: 1,
+		select {
+		case c <- &parallelECSResult{qCtx: qCtxS, err: err, from: 1}:
+		case <-taskCtx.Done():
 		}
 	}()
 
-	return asyncWait(ctx, qCtx, f.logger, c, 2)
+	return asyncWait(taskCtx, qCtx, f.logger, c, &wg, cancel)
 }

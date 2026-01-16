@@ -31,43 +31,46 @@ import (
 	"github.com/pmkol/mosdns-x/pkg/query_context"
 )
 
-func asyncWait(ctx context.Context, qCtx *query_context.Context, logger *zap.Logger, c chan *parallelECSResult, total int) error {
-	for i := 0; i < total; i++ {
+func asyncWait(ctx context.Context, qCtx *query_context.Context, logger *zap.Logger, c chan *parallelECSResult, wg *sync.WaitGroup, cancel context.CancelFunc) error {
+	go func() {
+		wg.Wait()
+		close(c)
+	}()
+
+	err := errors.New("no response")
+	for range cap(c) {
 		select {
+		case <-ctx.Done():
+			return ctx.Err()
+
 		case res := <-c:
 			if res.err != nil {
 				logger.Warn("sequence failed", qCtx.InfoField(), zap.Int("sequence", res.from), zap.Error(res.err))
+				err = res.err
 				continue
 			}
 
 			if r := res.qCtx.R(); r != nil {
 				logger.Debug("sequence returned a response", qCtx.InfoField(), zap.Int("sequence", res.from))
+				cancel()
 				qCtx.SetResponse(r)
+				qCtx.SetFrom(res.qCtx.From())
 				return nil
 			}
 
 			logger.Debug("sequence returned with an empty response", qCtx.InfoField(), zap.Int("sequence", res.from))
-			continue
-
-		case <-ctx.Done():
-			return ctx.Err()
 		}
 	}
-
-	// No response
-	return errors.New("no response")
+	return err
 }
 
 // LastNode returns the Latest node of chain of n.
 func LastNode(n ExecutableChainNode) ExecutableChainNode {
 	p := n
-	for {
-		if nn := p.Next(); nn == nil {
-			return p
-		} else {
-			p = nn
-		}
+	for p.Next() != nil {
+		p = p.Next()
 	}
+	return p
 }
 
 func ExecChainNode(ctx context.Context, qCtx *query_context.Context, n ExecutableChainNode) error {

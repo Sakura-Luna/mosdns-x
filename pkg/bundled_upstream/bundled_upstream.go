@@ -22,6 +22,7 @@ package bundled_upstream
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
@@ -51,57 +52,65 @@ type parallelResult struct {
 
 var nopLogger = zap.NewNop()
 
-var ErrAllFailed = errors.New("all upstreams failed")
-
-func ExchangeParallel(ctx context.Context, qCtx *query_context.Context, upstreams []Upstream, logger *zap.Logger) (*dns.Msg, error) {
+func ExchangeParallel(ctx context.Context, qCtx *query_context.Context, upstreams []Upstream, logger *zap.Logger) (*dns.Msg, error, string) {
 	if logger == nil {
 		logger = nopLogger
 	}
 
 	q := qCtx.Q()
-	t := len(upstreams)
-	if t == 1 {
-		return upstreams[0].Exchange(ctx, q)
-	}
+	taskCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	c := make(chan *parallelResult, t) // use buf chan to avoid blocking.
-	qCopy := q.Copy()                  // qCtx is not safe for concurrent use.
+	var wg sync.WaitGroup
+	c := make(chan *parallelResult, len(upstreams)) // use buf chan to avoid blocking.
 	for _, u := range upstreams {
 		u := u
+		qCopy := q.Copy() // qCtx is not safe for concurrent use.
+
+		wg.Add(1)
 		go func() {
-			r, err := u.Exchange(ctx, qCopy)
-			c <- &parallelResult{
-				r:    r,
-				err:  err,
-				from: u,
+			defer wg.Done()
+			r, err := u.Exchange(taskCtx, qCopy)
+
+			select {
+			case c <- &parallelResult{r: r, err: err, from: u}:
+			case <-taskCtx.Done():
+				return
 			}
 		}()
 	}
+	go func() {
+		wg.Wait()
+		close(c)
+	}()
 
-	for i := 0; i < t; i++ {
+	var err error
+	for range upstreams {
 		select {
+		case <-taskCtx.Done():
+			return nil, taskCtx.Err(), ""
+
 		case res := <-c:
 			if res.err != nil {
-				msg := []zap.Field{qCtx.InfoField(), zap.String("addr", res.from.Address())}
-				if ip := res.from.IPAddress(); ip != "" {
-					msg = append(msg, zap.String("ip", ip))
+				switch {
+				case errors.Is(res.err, context.Canceled):
+					msg := []zap.Field{qCtx.InfoField(), zap.String("addr", res.from.Address())}
+					if ip := res.from.IPAddress(); ip != "" {
+						msg = append(msg, zap.String("ip", ip))
+					}
+					logger.Warn("upstream", append(msg, zap.Error(res.err))...)
+					err = res.err
+				case err == nil:
+					err = res.err
 				}
-				logger.Warn("upstream err", msg...)
 				continue
 			}
 
-			if res.r == nil {
-				continue
+			if res.r != nil && (res.from.Trusted() || res.r.Rcode == dns.RcodeSuccess) {
+				cancel()
+				return res.r, nil, res.from.Address()
 			}
-
-			if res.from.Trusted() || res.r.Rcode == dns.RcodeSuccess {
-				return res.r, nil
-			}
-			continue
-
-		case <-ctx.Done():
-			return nil, ctx.Err()
 		}
 	}
-	return nil, ErrAllFailed
+	return nil, err, ""
 }

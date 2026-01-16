@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -38,19 +39,14 @@ type ParallelNode struct {
 }
 
 const (
-	defaultParallelTimeout = time.Second * 5
+	parallelTimeout = time.Second * 3
 )
 
 type ParallelConfig struct {
 	Parallel []interface{} `yaml:"parallel"`
 }
 
-func ParseParallelNode(
-	c *ParallelConfig,
-	logger *zap.Logger,
-	execs map[string]Executable,
-	matchers map[string]Matcher,
-) (*ParallelNode, error) {
+func ParseParallelNode(c *ParallelConfig, logger *zap.Logger, execs map[string]Executable, matchers map[string]Matcher) (*ParallelNode, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -87,36 +83,40 @@ func (p *ParallelNode) exec(ctx context.Context, qCtx *query_context.Context) er
 		return nil
 	}
 
-	t := len(p.s)
+	var wg sync.WaitGroup
 	c := make(chan *parallelECSResult, len(p.s)) // use buf chan to avoid blocking.
 
-	for i, n := range p.s {
-		i := i
-		n := n
+	var taskCtx context.Context
+	var cancel context.CancelFunc
+
+	if p.timeout > 0 {
+		p.logger.Sugar().Warn("executing parallel command with timeout %v", p.timeout)
+	}
+	timeout := time.Now().Add(parallelTimeout)
+	if ddl, ok := ctx.Deadline(); !ok || ddl.After(timeout) {
+		taskCtx, cancel = context.WithDeadline(ctx, timeout)
+	} else {
+		taskCtx, cancel = context.WithTimeout(ctx, parallelTimeout)
+	}
+	defer cancel()
+
+	for i, node := range p.s {
+		i, node := i, node
 		qCtxCopy := qCtx.Copy()
 
-		var pCtx context.Context
-		var cancel func()
-		if p.timeout > 0 {
-			pCtx, cancel = context.WithTimeout(context.Background(), p.timeout)
-		} else {
-			if ddl, ok := ctx.Deadline(); ok {
-				pCtx, cancel = context.WithDeadline(ctx, ddl)
-			}
-			pCtx, cancel = context.WithTimeout(ctx, defaultParallelTimeout)
-		}
-
+		wg.Add(1)
 		go func() {
-			defer cancel()
+			defer wg.Done()
+			pCtx, pCancel := context.WithCancel(taskCtx)
+			defer pCancel()
 
-			err := ExecChainNode(pCtx, qCtxCopy, n)
-			c <- &parallelECSResult{
-				qCtx: qCtxCopy,
-				err:  err,
-				from: i,
+			err := ExecChainNode(pCtx, qCtxCopy, node)
+			select {
+			case c <- &parallelECSResult{qCtx: qCtxCopy, err: err, from: i}:
+			case <-pCtx.Done():
 			}
 		}()
 	}
 
-	return asyncWait(ctx, qCtx, p.logger, c, t)
+	return asyncWait(taskCtx, qCtx, p.logger, c, &wg, cancel)
 }

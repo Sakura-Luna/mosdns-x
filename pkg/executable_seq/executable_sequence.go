@@ -71,7 +71,7 @@ func BuildExecutableLogicTree(
 	case string:
 		exec := execs[v]
 		if exec == nil {
-			return nil, fmt.Errorf("can not find execuable %s", v)
+			return nil, fmt.Errorf("can not find executable %s", v)
 		}
 		return WrapExecutable(exec), nil
 

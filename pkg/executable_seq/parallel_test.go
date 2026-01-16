@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
@@ -52,7 +53,7 @@ func Test_ParallelNode(t *testing.T) {
 		{"p2 response #2", nil, er, r2, nil, r2, false},
 	}
 
-	ctx := context.Background()
+	wantLatency := 30 * time.Millisecond
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			execs := make(map[string]Executable)
@@ -76,8 +77,17 @@ func Test_ParallelNode(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			ctx, cancel := context.WithTimeout(context.Background(), wantLatency)
+			defer cancel()
+
+			start := time.Now()
 			qCtx := query_context.NewContext(new(dns.Msg), nil)
 			err = ExecChainNode(ctx, qCtx, WrapExecutable(parallelNode))
+
+			if time.Since(start) > wantLatency {
+				t.Fatalf("execCmd() timeout: latency = %vms, want = %vms",
+					time.Since(start).Milliseconds(), wantLatency.Milliseconds())
+			}
 			if tt.wantErr != (err != nil) {
 				t.Fatalf("execCmd() error = %v, wantErr %v", err, tt.wantErr)
 			}

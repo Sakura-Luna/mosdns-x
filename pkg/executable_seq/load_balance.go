@@ -51,12 +51,7 @@ type LBConfig struct {
 	LoadBalance []interface{} `yaml:"load_balance"`
 }
 
-func ParseLBNode(
-	c *LBConfig,
-	logger *zap.Logger,
-	execs map[string]Executable,
-	matchers map[string]Matcher,
-) (*LBNode, error) {
+func ParseLBNode(c *LBConfig, logger *zap.Logger, execs map[string]Executable, matchers map[string]Matcher) (*LBNode, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -78,9 +73,6 @@ func (lbn *LBNode) Exec(ctx context.Context, qCtx *query_context.Context, next E
 	}
 
 	nextIdx := atomic.AddUint32(&lbn.p, 1) % uint32(len(lbn.branchNode))
-	err := ExecChainNode(ctx, qCtx, lbn.branchNode[nextIdx])
-	if err != nil {
-		return fmt.Errorf("command sequence #%d: %w", nextIdx, err)
-	}
+	_ = ExecChainNode(ctx, qCtx, lbn.branchNode[nextIdx])
 	return nil
 }

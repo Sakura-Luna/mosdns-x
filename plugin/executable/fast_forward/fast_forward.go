@@ -26,9 +26,11 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/miekg/dns"
+	"go.uber.org/zap"
 
 	"github.com/pmkol/mosdns-x/coremain"
 	"github.com/pmkol/mosdns-x/pkg/bundled_upstream"
@@ -145,9 +147,11 @@ func newFastForward(bp *coremain.BP, args *Args) (*fastForward, error) {
 			}
 			upstreams = append(upstreams, u)
 		}
-		k, err := upstream.SelectFastestUpstream(upstreams)
+		k, err := SelectFastestUpstream(upstreams)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create upstream, because: %w", err)
+			k = 0
+			err = fmt.Errorf("failed to set upstream, because: %w", err)
+			bp.L().Error("upstream", zap.String("addr", c.Addr), zap.Error(err))
 		}
 		u := upstreams[k]
 
@@ -167,6 +171,49 @@ func newFastForward(bp *coremain.BP, args *Args) (*fastForward, error) {
 	}
 
 	return f, nil
+}
+
+func SelectFastestUpstream(upstreams []upstream.Upstream) (int, error) {
+	if len(upstreams) == 1 {
+		return 0, nil
+	}
+
+	var wg sync.WaitGroup
+	ch := make(chan int, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+
+	for i, u := range upstreams {
+		i, u := i, u
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			q := new(dns.Msg)
+			q.SetQuestion("example.com.", dns.TypeA)
+			r, err := u.ExchangeContext(ctx, q)
+			if err != nil || r == nil || r.Id != q.Id {
+				return
+			}
+
+			select {
+			case ch <- i:
+			case <-ctx.Done():
+			}
+		}()
+	}
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
+	select {
+	case i := <-ch:
+		return i, nil
+	case <-ctx.Done():
+		return -1, errors.New("all upstream timeouts")
+	}
 }
 
 type upstreamWrapper struct {
@@ -198,20 +245,28 @@ func (u *upstreamWrapper) Trusted() bool {
 // - handler.ContextStatusResponded: if it received a response.
 // - handler.ContextStatusServerFailed: if all upstreams failed.
 func (f *fastForward) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
-	err := f.exec(ctx, qCtx)
-	if err != nil {
-		return err
-	}
+	_ = f.exec(ctx, qCtx)
 	return executable_seq.ExecChainNode(ctx, qCtx, next)
 }
 
 func (f *fastForward) exec(ctx context.Context, qCtx *query_context.Context) (err error) {
-	r, err := bundled_upstream.ExchangeParallel(ctx, qCtx, f.upstreamWrappers, f.L())
-	if err != nil {
-		return err
+	var r *dns.Msg
+	var addr string
+
+	deadline := time.Now().Add(time.Second * 3)
+	if ddl, ok := ctx.Deadline(); !ok || ddl.After(deadline) {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithDeadline(ctx, deadline)
+		defer cancel()
 	}
-	qCtx.SetResponse(r)
-	return nil
+
+	r, err, addr = bundled_upstream.ExchangeParallel(ctx, qCtx, f.upstreamWrappers, f.L())
+
+	if r != nil {
+		qCtx.SetResponse(r)
+		qCtx.SetFrom(f.Tag() + "@" + addr)
+	}
+	return err
 }
 
 func (f *fastForward) Shutdown() error {

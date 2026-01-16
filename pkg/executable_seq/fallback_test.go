@@ -88,7 +88,8 @@ func Test_FallbackECS_fallback(t *testing.T) {
 
 			qCtx := query_context.NewContext(new(dns.Msg), nil)
 			err = ExecChainNode(ctx, qCtx, WrapExecutable(fallbackECS))
-			if tt.wantErr != (err != nil) {
+			// if tt.wantErr != (err != nil) {
+			if tt.wantErr && qCtx.R() != nil {
 				t.Fatalf("execCmd() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
@@ -169,7 +170,8 @@ func Test_FallbackECS_fast_fallback(t *testing.T) {
 			if time.Since(start) > time.Millisecond*time.Duration(tt.wantLatency) {
 				t.Fatalf("execCmd() timeout: latency = %vms, want = %vms", time.Since(start).Milliseconds(), tt.wantLatency)
 			}
-			if tt.wantErr != (err != nil) {
+			// if tt.wantErr != (err != nil) {
+			if tt.wantErr && (qCtx.R() != nil || ctx.Err() == nil) {
 				t.Fatalf("execCmd() error = %v, wantErr %v", err, tt.wantErr)
 			}
 

@@ -23,14 +23,12 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/miekg/dns"
@@ -303,69 +301,6 @@ func NewUpstream(addr string, opt *Opt) (Upstream, error) {
 		}), nil
 	default:
 		return nil, fmt.Errorf("unsupported protocol [%s]", addrURL.Scheme)
-	}
-}
-
-func SelectFastestUpstream(upstreams []Upstream) (int, error) {
-	if len(upstreams) == 1 {
-		return 0, nil
-	}
-	var wg sync.WaitGroup
-	resultCh := make(chan int, 1)
-	errCh := make(chan error, len(upstreams))
-	finish := make(chan struct{})
-
-	q := new(dns.Msg)
-	q.SetQuestion("example.com.", dns.TypeA)
-
-	var once sync.Once
-	for i, u := range upstreams {
-		wg.Add(1)
-		i := i
-		u := u
-
-		go func() {
-			defer wg.Done()
-
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-
-			r, err := u.ExchangeContext(ctx, q)
-			if err != nil {
-				errCh <- err
-				return
-			}
-			if r.Id != q.Id {
-				errCh <- dns.ErrId
-				return
-			}
-
-			select {
-			case resultCh <- i:
-				once.Do(func() { close(finish) })
-			case <-finish:
-			}
-		}()
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultCh)
-		close(errCh)
-	}()
-
-	select {
-	case fastestUpstream, ok := <-resultCh:
-		if !ok {
-			var allErrs []error
-			for err := range errCh {
-				allErrs = append(allErrs, err)
-			}
-			return -1, fmt.Errorf("all upstreams failed: %v", allErrs)
-		}
-		return fastestUpstream, nil
-	case <-time.After(3 * time.Second):
-		return -1, errors.New("timeout waiting for upstreams")
 	}
 }
 

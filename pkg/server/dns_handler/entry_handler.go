@@ -22,7 +22,6 @@ package dns_handler
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -96,11 +95,10 @@ func NewEntryHandler(opts EntryHandlerOpts) (*EntryHandler, error) {
 func (h *EntryHandler) ServeDNS(ctx context.Context, req *dns.Msg, meta *query_context.RequestMeta) (*dns.Msg, error) {
 	// apply timeout to ctx
 	ddl := time.Now().Add(h.opts.QueryTimeout)
-	ctxDdl, ok := ctx.Deadline()
-	if !(ok && ctxDdl.Before(ddl)) {
-		newCtx, cancel := context.WithDeadline(ctx, ddl)
+	if d, ok := ctx.Deadline(); !ok || d.After(ddl) {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithDeadline(ctx, ddl)
 		defer cancel()
-		ctx = newCtx
 	}
 	// return FORMERR response
 	if len(req.Question) == 0 {
@@ -108,9 +106,8 @@ func (h *EntryHandler) ServeDNS(ctx context.Context, req *dns.Msg, meta *query_c
 		return h.responseFormErr(req), nil
 	}
 	for _, question := range req.Question {
-		_, ok := dns.IsDomainName(question.Name)
-		if !ok {
-			h.opts.Logger.Warn(fmt.Sprintf("invalid question name: %s", question.Name))
+		if _, ok := dns.IsDomainName(question.Name); !ok {
+			h.opts.Logger.Warn("invalid question name: " + question.Name)
 			return h.responseFormErr(req), nil
 		}
 	}
@@ -121,13 +118,15 @@ func (h *EntryHandler) ServeDNS(ctx context.Context, req *dns.Msg, meta *query_c
 	qCtx := query_context.NewContext(req, meta)
 	err := h.opts.Entry.Exec(ctx, qCtx, nil)
 	respMsg := qCtx.R()
-	if err != nil {
-		h.opts.Logger.Warn("entry returned an err", qCtx.InfoField(), zap.Error(err))
-	} else {
-		h.opts.Logger.Debug("entry returned", qCtx.InfoField())
+	if err == nil {
+		err = ctx.Err()
 	}
-	if err == nil && respMsg == nil {
-		h.opts.Logger.Error("entry returned an nil response", qCtx.InfoField())
+	if err != nil {
+		h.opts.Logger.Warn("entry", zap.String("status", err.Error()), qCtx.InfoField())
+	} else if respMsg == nil {
+		h.opts.Logger.Error("entry", zap.String("status", "returned an nil response"), qCtx.InfoField())
+	} else {
+		h.opts.Logger.Debug("entry", zap.String("status", "success returned"), qCtx.InfoField())
 	}
 
 	if respMsg == nil || err != nil {
