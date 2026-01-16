@@ -38,7 +38,7 @@ func init() {
 
 	// You can also register a plugin object directly. (If plugin do not need to configure)
 	// Then you can directly use "_sleep_500ms" in configuration file.
-	coremain.RegNewPersetPluginFunc("_sleep_500ms", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_sleep_500ms", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &sleep{BP: bp, d: time.Millisecond * 500}, nil
 	})
 }

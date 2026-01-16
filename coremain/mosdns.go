@@ -99,7 +99,7 @@ func RunMosdns(cfg *Config) error {
 	}
 
 	// Init preset plugins
-	for tag, f := range LoadNewPersetPluginFuncs() {
+	for tag, f := range LoadNewPresetPluginFuncs() {
 		p, err := f(NewBP(tag, "preset", m.logger, m))
 		if err != nil {
 			return fmt.Errorf("failed to init preset plugin %s, %w", tag, err)

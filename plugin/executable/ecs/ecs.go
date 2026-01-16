@@ -38,7 +38,7 @@ const PluginType = "ecs"
 func init() {
 	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
 
-	coremain.RegNewPersetPluginFunc("_no_ecs", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_no_ecs", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &noECS{BP: bp}, nil
 	})
 }
@@ -100,9 +100,8 @@ func newPlugin(bp *coremain.BP, args *Args) (p *ecsPlugin, err error) {
 		}
 		if !addr.Is4() {
 			return nil, fmt.Errorf("%s is not a ipv4 address", args.IPv4)
-		} else {
-			ep.ipv4 = addr
 		}
+		ep.ipv4 = addr
 	}
 
 	if len(args.IPv6) != 0 {
@@ -112,9 +111,8 @@ func newPlugin(bp *coremain.BP, args *Args) (p *ecsPlugin, err error) {
 		}
 		if !addr.Is6() {
 			return nil, fmt.Errorf("%s is not a ipv6 address", args.IPv6)
-		} else {
-			ep.ipv6 = addr
 		}
+		ep.ipv6 = addr
 	}
 
 	return ep, nil

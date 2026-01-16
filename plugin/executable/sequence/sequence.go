@@ -32,7 +32,7 @@ const PluginType = "sequence"
 
 func init() {
 	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
-	coremain.RegNewPersetPluginFunc("_return", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_return", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &_return{BP: bp}, nil
 	})
 }

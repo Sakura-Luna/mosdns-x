@@ -40,10 +40,10 @@ const PluginType = "response_matcher"
 func init() {
 	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
 
-	coremain.RegNewPersetPluginFunc("_valid_answer", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_valid_answer", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &hasValidAnswer{BP: bp}, nil
 	})
-	coremain.RegNewPersetPluginFunc("_empty_ip_answer", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_empty_ip_answer", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &hasEmptyIPAnswer{BP: bp}, nil
 	})
 }

@@ -32,7 +32,7 @@ import (
 const PluginType = "reject_any"
 
 func init() {
-	coremain.RegNewPersetPluginFunc("_reject_any", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_reject_any", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &rejectAny{BP: bp}, nil
 	})
 }

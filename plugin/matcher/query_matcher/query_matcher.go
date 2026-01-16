@@ -40,20 +40,20 @@ const PluginType = "query_matcher"
 func init() {
 	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
 
-	coremain.RegNewPersetPluginFunc(
+	coremain.RegNewPresetPluginFunc(
 		"_qtype_A_AAAA",
 		func(bp *coremain.BP) (coremain.Plugin, error) {
 			return newQueryMatcher(bp, &Args{QType: []int{int(dns.TypeA), int(dns.TypeAAAA)}})
 		},
 	)
-	coremain.RegNewPersetPluginFunc(
+	coremain.RegNewPresetPluginFunc(
 		"_qtype_AAAA",
 		func(bp *coremain.BP) (coremain.Plugin, error) {
 			return newQueryMatcher(bp, &Args{QType: []int{int(dns.TypeAAAA)}})
 		},
 	)
 
-	coremain.RegNewPersetPluginFunc(
+	coremain.RegNewPresetPluginFunc(
 		"_query_edns0",
 		func(bp *coremain.BP) (coremain.Plugin, error) {
 			return &queryIsEDNS0{BP: bp}, nil

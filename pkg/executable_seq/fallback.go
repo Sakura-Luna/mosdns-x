@@ -158,11 +158,10 @@ func (f *FallbackNode) exec(ctx context.Context, qCtx *query_context.Context) er
 	if f.primaryST == nil || f.primaryST.good() {
 		if f.fastFallbackDuration > 0 {
 			return f.doFastFallback(ctx, qCtx)
-		} else {
-			return f.doPrimary(ctx, qCtx)
 		}
+		return f.doPrimary(ctx, qCtx)
 	}
-	f.logger.Debug("primary is not good", qCtx.InfoField())
+	f.logger.Warn("secondary turned on", qCtx.InfoField())
 	return f.doFallback(ctx, qCtx)
 }
 

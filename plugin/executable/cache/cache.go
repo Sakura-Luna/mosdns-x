@@ -48,14 +48,14 @@ const (
 func init() {
 	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
 
-	coremain.RegNewPersetPluginFunc("_default_cache", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_default_cache", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newCachePlugin(bp, &Args{})
 	})
 }
 
 const (
-	defaultLazyUpdateTimeout = time.Second * 5
-	defaultEmptyAnswerTTL    = time.Second * 300
+	lazyUpdateTimeout = time.Second * 5
+	emptyAnswerTTL    = time.Second * 300
 )
 
 var _ coremain.ExecutablePlugin = (*cachePlugin)(nil)
@@ -243,7 +243,7 @@ func (c *cachePlugin) lookupCache(msgKey string) (r *dns.Msg, lazyHit bool, err 
 
 		var msgTTL time.Duration
 		if len(r.Answer) == 0 {
-			msgTTL = defaultEmptyAnswerTTL
+			msgTTL = emptyAnswerTTL
 		} else {
 			msgTTL = time.Duration(dnsutils.GetMinimalTTL(r)) * time.Second
 		}
@@ -273,7 +273,7 @@ func (c *cachePlugin) doLazyUpdate(msgKey string, qCtx *query_context.Context, n
 	lazyUpdateFunc := func() (interface{}, error) {
 		c.L().Debug("start lazy cache update", lazyQCtx.InfoField())
 		defer c.lazyUpdateSF.Forget(msgKey)
-		lazyCtx, cancel := context.WithTimeout(context.Background(), defaultLazyUpdateTimeout)
+		lazyCtx, cancel := context.WithTimeout(context.Background(), lazyUpdateTimeout)
 		defer cancel()
 
 		err := executable_seq.ExecChainNode(lazyCtx, lazyQCtx, next)

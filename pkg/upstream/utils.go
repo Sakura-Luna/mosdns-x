@@ -20,6 +20,6 @@
 package upstream
 
 type socketOpts struct {
-	so_mark        int
-	bind_to_device string
+	soMark       int
+	bindToDevice string
 }

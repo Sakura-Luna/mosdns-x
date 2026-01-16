@@ -52,7 +52,6 @@ func GetAddrFromAddr(addr net.Addr) netip.Addr {
 func SplitSchemeAndHost(addr string) (protocol, host string) {
 	if protocol, host, ok := SplitString2(addr, "://"); ok {
 		return protocol, host
-	} else {
-		return "", addr
 	}
+	return "", addr
 }

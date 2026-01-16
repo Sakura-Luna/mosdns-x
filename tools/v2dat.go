@@ -127,11 +127,7 @@ func UnpackDomainDAT(in, outDir string) error {
 
 func fileName(f string) string {
 	f = filepath.Base(f)
-	if i := strings.LastIndexByte(f, '.'); i == -1 {
-		return f
-	} else {
-		return f[:i]
-	}
+	return strings.TrimSuffix(f, filepath.Ext(f))
 }
 
 func convertV2DomainToTextFile(domain []*v2data.Domain, file string) error {

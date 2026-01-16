@@ -205,7 +205,9 @@ func (s *vServer) ServeDNS(w dns.ResponseWriter, q *dns.Msg) {
 	if s.bigMsg {
 		r.SetEdns0(dns.MaxMsgSize, false)
 		opt := r.IsEdns0()
-		opt.Option = append(opt.Option, &dns.EDNS0_PADDING{Padding: padding})
+		if opt != nil {
+			opt.Option = append(opt.Option, &dns.EDNS0_PADDING{Padding: padding})
+		}
 	}
 
 	time.Sleep(s.latency)

@@ -34,10 +34,10 @@ const PluginType = "edns0_filter"
 
 func init() {
 	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
-	coremain.RegNewPersetPluginFunc("_edns0_filter_no_edns0", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_edns0_filter_no_edns0", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return NewFilter(bp, &Args{NoEDNS: true}), nil
 	})
-	coremain.RegNewPersetPluginFunc("_edns0_filter_ecs_only", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_edns0_filter_ecs_only", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return NewFilter(bp, &Args{Keep: []uint16{dns.EDNS0SUBNET}}), nil
 	})
 }

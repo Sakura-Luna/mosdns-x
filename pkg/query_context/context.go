@@ -190,7 +190,6 @@ func (ctx *Context) SetResponse(r *dns.Msg) {
 }
 
 func (ctx *Context) SetFrom(f string) {
-	// fmt.Printf("Set From: {%+v} at %+v -> Answer: %+v\n", ctx.from, &ctx, ctx.r != nil)
 	ctx.from = f
 }
 

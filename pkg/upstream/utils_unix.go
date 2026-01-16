@@ -33,17 +33,17 @@ func getSocketControlFunc(opts socketOpts) func(string, string, syscall.RawConn)
 		var sysCallErr error
 		if err := c.Control(func(fd uintptr) {
 			// SO_MARK
-			if opts.so_mark > 0 {
-				sysCallErr = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_MARK, opts.so_mark)
+			if opts.soMark > 0 {
+				sysCallErr = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_MARK, opts.soMark)
 				if sysCallErr != nil {
 					sysCallErr = os.NewSyscallError("failed to set SO_MARK", sysCallErr)
 					return
 				}
 			}
 
-			// SO_BINDTODEVICE
-			if len(opts.bind_to_device) > 0 {
-				sysCallErr = unix.SetsockoptString(int(fd), unix.SOL_SOCKET, unix.SO_BINDTODEVICE, opts.bind_to_device)
+			// SO_BindToDevice
+			if len(opts.bindToDevice) > 0 {
+				sysCallErr = unix.SetsockoptString(int(fd), unix.SOL_SOCKET, unix.SO_BINDTODEVICE, opts.bindToDevice)
 				if sysCallErr != nil {
 					sysCallErr = os.NewSyscallError("failed to set SO_BINDTODEVICE", sysCallErr)
 					return

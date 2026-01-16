@@ -119,7 +119,7 @@ func (r *RedisCache) Get(key string) (v []byte, storedTime, expirationTime time.
 	defer cancel()
 	b, err := r.opts.Client.Get(ctx, key).Bytes()
 	if err != nil {
-		if err != redis.Nil {
+		if !errors.Is(err, redis.Nil) {
 			r.opts.Logger.Warn("redis get", zap.Error(err))
 			r.disableClient()
 		}

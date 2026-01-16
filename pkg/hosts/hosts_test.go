@@ -29,7 +29,7 @@ import (
 	"github.com/pmkol/mosdns-x/pkg/matcher/domain"
 )
 
-var test_hosts = `
+var testHosts = `
 # comment
      # empty line
 dns.google 8.8.8.8 8.8.4.4 2001:4860:4860::8844 2001:4860:4860::8888
@@ -42,7 +42,7 @@ test.com 2.3.4.5
 func Test_hostsContainer_Match(t *testing.T) {
 	m := domain.NewMixMatcher[*IPs]()
 	m.SetDefaultMatcher(domain.MatcherDomain)
-	err := domain.LoadFromTextReader[*IPs](m, bytes.NewBuffer([]byte(test_hosts)), ParseIPs)
+	err := domain.LoadFromTextReader[*IPs](m, bytes.NewBuffer([]byte(testHosts)), ParseIPs)
 	if err != nil {
 		t.Fatal(err)
 	}

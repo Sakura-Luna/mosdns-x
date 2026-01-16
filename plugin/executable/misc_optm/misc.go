@@ -39,7 +39,7 @@ const (
 )
 
 func init() {
-	coremain.RegNewPersetPluginFunc("_misc_optm", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_misc_optm", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &optm{BP: bp}, nil
 	})
 }

@@ -70,23 +70,22 @@ func ParseSocksAddr(s string) (*SocksAddr, error) {
 	if addrPort, err := netip.ParseAddrPort(s); err == nil {
 		if addrPort.Addr().Is4In6() {
 			return &SocksAddr{addr: addrPort.Addr().Unmap(), port: addrPort.Port()}, nil
-		} else {
-			return &SocksAddr{addr: addrPort.Addr(), port: addrPort.Port()}, nil
 		}
+		return &SocksAddr{addr: addrPort.Addr(), port: addrPort.Port()}, nil
 	} else if !strings.Contains(s, ":") {
 		return nil, fmt.Errorf("invalid socksaddr")
-	} else {
-		addrPort := strings.SplitN(s, ":", 2)
-		addr := addrPort[0]
-		if len([]byte(addr)) > 255 {
-			return nil, fmt.Errorf("address too long")
-		}
-		port, err := strconv.Atoi(addrPort[1])
-		if err != nil || port < 0 || port > 65535 {
-			return nil, fmt.Errorf("invalid port")
-		}
-		return &SocksAddr{fqdn: addr, port: uint16(port)}, nil
 	}
+
+	addrPort := strings.SplitN(s, ":", 2)
+	addr := addrPort[0]
+	if len([]byte(addr)) > 255 {
+		return nil, fmt.Errorf("address too long")
+	}
+	port, err := strconv.Atoi(addrPort[1])
+	if err != nil || port < 0 || port > 65535 {
+		return nil, fmt.Errorf("invalid port")
+	}
+	return &SocksAddr{fqdn: addr, port: uint16(port)}, nil
 }
 
 func SocksAddrFromFqdnPort(fqdn string, port uint16) *SocksAddr {
@@ -116,9 +115,8 @@ func (s *SocksAddr) SetPort(port uint16) {
 func (s *SocksAddr) String() string {
 	if len(s.fqdn) > 0 {
 		return fmt.Sprintf("%s:%d", s.fqdn, s.port)
-	} else {
-		return fmt.Sprintf("%v:%d", s.addr, s.port)
 	}
+	return fmt.Sprintf("%v:%d", s.addr, s.port)
 }
 
 func (s *SocksAddr) Slice() []byte {
@@ -137,23 +135,21 @@ func (s *SocksAddr) Slice() []byte {
 func (s *SocksAddr) NetAddr() net.Addr {
 	if len(s.fqdn) == 0 {
 		return net.UDPAddrFromAddrPort(netip.AddrPortFrom(s.addr, s.port))
-	} else {
-		addr := UDPFqdnAddr(s.String())
-		return &addr
 	}
+	addr := UDPFqdnAddr(s.String())
+	return &addr
 }
 
 func (s *SocksAddr) UDPAddr() (*net.UDPAddr, error) {
 	if len(s.fqdn) == 0 {
 		return net.UDPAddrFromAddrPort(netip.AddrPortFrom(s.addr, s.port)), nil
-	} else {
-		return nil, fmt.Errorf("cannot convert fqdn socksaddr to an *net.UDPConn")
 	}
+	return nil, fmt.Errorf("cannot convert fqdn socksaddr to an *net.UDPConn")
 }
 
 type UDPFqdnAddr string
 
-func (f *UDPFqdnAddr) Network() string {
+func (f UDPFqdnAddr) Network() string {
 	return "udp"
 }
 

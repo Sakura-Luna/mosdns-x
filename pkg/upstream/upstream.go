@@ -98,7 +98,7 @@ type Opt struct {
 	// HTTP3 is not supported.
 	Bootstrap string
 
-	// TLS skip certificate veriry
+	// TLS skip certificate verify
 	Insecure bool
 
 	// The set of root certificate authorities that clients use when verifying server certificates.
@@ -133,8 +133,8 @@ func NewUpstream(addr string, opt *Opt) (Upstream, error) {
 		Dialer: &net.Dialer{
 			Resolver: bootstrap.NewPlainBootstrap(opt.Bootstrap),
 			Control: getSocketControlFunc(socketOpts{
-				so_mark:        opt.SoMark,
-				bind_to_device: opt.BindToDevice,
+				soMark:       opt.SoMark,
+				bindToDevice: opt.BindToDevice,
 			}),
 		},
 		SocksAddr:  opt.Socks5,
@@ -348,24 +348,24 @@ func tryRemovePort(s string) string {
 	return host
 }
 
-type udpWithFallback struct {
-	u *transport.Transport
-	t *transport.Transport
-}
-
-func (u *udpWithFallback) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, error) {
-	m, err := u.u.ExchangeContext(ctx, q)
-	if err != nil {
-		return nil, err
-	}
-	if m.Truncated {
-		return u.t.ExchangeContext(ctx, q)
-	}
-	return m, nil
-}
-
-func (u *udpWithFallback) Close() error {
-	u.u.Close()
-	u.t.Close()
-	return nil
-}
+// type udpWithFallback struct {
+// 	u *transport.Transport
+// 	t *transport.Transport
+// }
+//
+// func (u *udpWithFallback) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, error) {
+// 	m, err := u.u.ExchangeContext(ctx, q)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if m.Truncated {
+// 		return u.t.ExchangeContext(ctx, q)
+// 	}
+// 	return m, nil
+// }
+//
+// func (u *udpWithFallback) Close() error {
+// 	u.u.Close()
+// 	u.t.Close()
+// 	return nil
+// }

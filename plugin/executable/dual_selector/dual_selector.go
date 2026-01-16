@@ -45,10 +45,10 @@ const (
 
 func init() {
 	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
-	coremain.RegNewPersetPluginFunc("_prefer_ipv4", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_prefer_ipv4", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &Selector{BP: bp, mode: modePreferIPv4}, nil
 	})
-	coremain.RegNewPersetPluginFunc("_prefer_ipv6", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_prefer_ipv6", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &Selector{BP: bp, mode: modePreferIPv6}, nil
 	})
 }

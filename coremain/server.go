@@ -110,7 +110,7 @@ func (m *Mosdns) startServerListener(cfg *ServerListenerConfig, dnsHandler D.Han
 	s := server.NewServer(opts)
 
 	// helper func for proxy protocol listener
-	requirePP := func(_ net.Addr) (proxyproto.Policy, error) {
+	requirePP := func(opt proxyproto.ConnPolicyOptions) (proxyproto.Policy, error) {
 		return proxyproto.REQUIRE, nil
 	}
 
@@ -171,7 +171,7 @@ func (m *Mosdns) startServerListener(cfg *ServerListenerConfig, dnsHandler D.Han
 			return err
 		}
 		if cfg.ProxyProtocol {
-			l = &proxyproto.Listener{Listener: l, Policy: requirePP}
+			l = &proxyproto.Listener{Listener: l, ConnPolicy: requirePP}
 		}
 		switch cfg.Protocol {
 		case "tcp":

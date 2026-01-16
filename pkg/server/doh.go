@@ -21,6 +21,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/url"
@@ -56,7 +57,7 @@ func (s *Server) ServeHTTP(l net.Listener) error {
 	defer s.trackCloser(hs, false)
 
 	err := hs.Serve(l)
-	if err == http.ErrServerClosed { // Replace http.ErrServerClosed with our ErrServerClosed
+	if errors.Is(err, http.ErrServerClosed) { // Replace http.ErrServerClosed with our ErrServerClosed
 		return ErrServerClosed
 	} else if err != nil {
 		return err
@@ -83,12 +84,11 @@ func (r *eRequest) URL() *url.URL {
 func (r *eRequest) TLS() *H.TlsInfo {
 	if r.r.TLS == nil {
 		return nil
-	} else {
-		return &H.TlsInfo{
-			Version:            r.r.TLS.Version,
-			ServerName:         r.r.TLS.ServerName,
-			NegotiatedProtocol: r.r.TLS.NegotiatedProtocol,
-		}
+	}
+	return &H.TlsInfo{
+		Version:            r.r.TLS.Version,
+		ServerName:         r.r.TLS.ServerName,
+		NegotiatedProtocol: r.r.TLS.NegotiatedProtocol,
 	}
 }
 

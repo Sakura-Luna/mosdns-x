@@ -37,13 +37,13 @@ const (
 
 func init() {
 	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(*Args) })
-	coremain.RegNewPersetPluginFunc("_query_summary", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_query_summary", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newLogger(bp, &Args{Source: true}), nil
 	})
-	coremain.RegNewPersetPluginFunc("_simple_summary", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_simple_summary", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newLogger(bp, &Args{}), nil
 	})
-	coremain.RegNewPersetPluginFunc("_query_summary_extend", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_query_summary_extend", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newLogger(bp, &Args{Source: true, Client: true}), nil
 	})
 }

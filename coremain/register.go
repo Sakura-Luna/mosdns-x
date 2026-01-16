@@ -129,29 +129,29 @@ func GetAllPluginTypes() []string {
 	return t
 }
 
-type NewPersetPluginFunc func(bp *BP) (Plugin, error)
+type NewPresetPluginFunc func(bp *BP) (Plugin, error)
 
 var presetPluginFuncReg struct {
 	sync.Mutex
-	m map[string]NewPersetPluginFunc
+	m map[string]NewPresetPluginFunc
 }
 
-func RegNewPersetPluginFunc(tag string, f NewPersetPluginFunc) {
+func RegNewPresetPluginFunc(tag string, f NewPresetPluginFunc) {
 	presetPluginFuncReg.Lock()
 	defer presetPluginFuncReg.Unlock()
 	if _, ok := presetPluginFuncReg.m[tag]; ok {
 		panic(fmt.Sprintf("preset plugin %s has already been registered", tag))
 	}
 	if presetPluginFuncReg.m == nil {
-		presetPluginFuncReg.m = make(map[string]NewPersetPluginFunc)
+		presetPluginFuncReg.m = make(map[string]NewPresetPluginFunc)
 	}
 	presetPluginFuncReg.m[tag] = f
 }
 
-func LoadNewPersetPluginFuncs() map[string]NewPersetPluginFunc {
+func LoadNewPresetPluginFuncs() map[string]NewPresetPluginFunc {
 	presetPluginFuncReg.Lock()
 	defer presetPluginFuncReg.Unlock()
-	m := make(map[string]NewPersetPluginFunc)
+	m := make(map[string]NewPresetPluginFunc)
 	for tag, pluginFunc := range presetPluginFuncReg.m {
 		m[tag] = pluginFunc
 	}

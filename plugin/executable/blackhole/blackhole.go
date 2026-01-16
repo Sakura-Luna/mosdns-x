@@ -37,25 +37,25 @@ const PluginType = "blackhole"
 func init() {
 	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
 
-	coremain.RegNewPersetPluginFunc("_drop_response", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_drop_response", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newBlackHole(bp, &Args{RCode: -1})
 	})
-	coremain.RegNewPersetPluginFunc("_new_empty_response", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_new_empty_response", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newBlackHole(bp, &Args{RCode: dns.RcodeSuccess})
 	})
-	coremain.RegNewPersetPluginFunc("_new_servfail_response", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_new_servfail_response", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newBlackHole(bp, &Args{RCode: dns.RcodeServerFailure})
 	})
-	coremain.RegNewPersetPluginFunc("_new_nxdomain_response", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_new_nxdomain_response", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newBlackHole(bp, &Args{RCode: dns.RcodeNameError})
 	})
-	coremain.RegNewPersetPluginFunc("_new_refused_response", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_new_refused_response", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newBlackHole(bp, &Args{RCode: dns.RcodeRefused})
 	})
-	coremain.RegNewPersetPluginFunc("_new_formerr_response", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_new_formerr_response", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newBlackHole(bp, &Args{RCode: dns.RcodeFormatError})
 	})
-	coremain.RegNewPersetPluginFunc("_new_notimp_response", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_new_notimp_response", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newBlackHole(bp, &Args{RCode: dns.RcodeNotImplemented})
 	})
 }

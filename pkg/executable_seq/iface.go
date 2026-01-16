@@ -36,7 +36,7 @@ type ExecutableChainNode interface {
 	LinkedListNode
 }
 
-// Matcher represents a matcher that can match a certain patten in Context.
+// Matcher represents a matcher that can match a certain pattern in Context.
 type Matcher interface {
 	Match(ctx context.Context, qCtx *query_context.Context) (matched bool, err error)
 }

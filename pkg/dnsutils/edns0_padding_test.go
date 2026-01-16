@@ -35,7 +35,9 @@ func TestPadToMinimum(t *testing.T) {
 
 	qPadded := qEDNS0.Copy()
 	opt := qPadded.IsEdns0()
-	opt.Option = append(opt.Option, &dns.EDNS0_PADDING{Padding: make([]byte, 16)})
+	if opt != nil {
+		opt.Option = append(opt.Option, &dns.EDNS0_PADDING{Padding: make([]byte, 16)})
+	}
 
 	qLarge := new(dns.Msg)
 	qLarge.SetQuestion(strings.Repeat("a.", 100), dns.TypeA)

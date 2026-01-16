@@ -21,6 +21,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -81,7 +82,8 @@ func (s *Server) ServeTCP(l net.Listener) error {
 			if s.Closed() {
 				return ErrServerClosed
 			}
-			if err, ok := err.(net.Error); ok && err.Temporary() {
+			var err net.Error
+			if errors.As(err, &err) && err.Temporary() {
 				continue
 			}
 			return fmt.Errorf("unexpected listener err: %w", err)

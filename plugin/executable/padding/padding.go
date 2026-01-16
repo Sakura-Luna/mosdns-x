@@ -33,13 +33,13 @@ import (
 const PluginType = "padding"
 
 func init() {
-	coremain.RegNewPersetPluginFunc("_pad_query", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_pad_query", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &PadQuery{BP: bp}, nil
 	})
-	coremain.RegNewPersetPluginFunc("_enable_conditional_response_padding", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_enable_conditional_response_padding", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &ResponsePaddingHandler{BP: bp}, nil
 	})
-	coremain.RegNewPersetPluginFunc("_enable_response_padding", func(bp *coremain.BP) (coremain.Plugin, error) {
+	coremain.RegNewPresetPluginFunc("_enable_response_padding", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &ResponsePaddingHandler{BP: bp, Always: true}, nil
 	})
 }
