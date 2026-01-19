@@ -43,8 +43,8 @@ github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/kardianos/service v1.2.4 h1:XNlGtZOYNx2u91urOdg/Kfmc+gfmuIo1Dd3rEi2OgBk=
 github.com/kardianos/service v1.2.4/go.mod h1:E4V9ufUuY82F7Ztlu1eN9VXWIQxg8NoLQlmFe0MtrXc=
-github.com/klauspost/compress v1.18.2 h1:iiPHWW0YrcFgpBYhsA6D1+fqHssJscY/Tm/y2Uqnapk=
-github.com/klauspost/compress v1.18.2/go.mod h1:R0h/fSBs8DE4ENlcrlib3PsXS61voFxhIs2DeRhCvJ4=
+github.com/klauspost/compress v1.18.3 h1:9PJRvfbmTabkOX8moIpXPbMMbYN60bWImDDU7L+/6zw=
+github.com/klauspost/compress v1.18.3/go.mod h1:R0h/fSBs8DE4ENlcrlib3PsXS61voFxhIs2DeRhCvJ4=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
 github.com/kr/pretty v0.3.1/go.mod h1:hoEshYVHaxMs3cyo3Yncou5ZscifuDolrwPKZanG3xk=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
@@ -119,12 +119,12 @@ gitlab.com/go-extension/hash v0.0.0-20250912170447-263d1d8375e4 h1:SMsGMMkGS9WBY
 gitlab.com/go-extension/hash v0.0.0-20250912170447-263d1d8375e4/go.mod h1:fgbJOB/r2jzfdhIdj6N0Hz6hahFqzSdU5TH1Hpoqq7c=
 gitlab.com/go-extension/hpke v0.0.0-20250903154322-ae11394c5e06 h1:Oq3ZLQwNdKzo9Td2reMCa/U5j4r48eKOjhJ+H8+Z5g8=
 gitlab.com/go-extension/hpke v0.0.0-20250903154322-ae11394c5e06/go.mod h1:em5FZ5PLgyAGGNIqhsJrl7Dgyg0uAI4SJvR3nzIHhQM=
-gitlab.com/go-extension/http v0.0.0-20251006175957-3113a1e48242 h1:J1Us00Z+h0en5JhvCS6+Z6worWjqxcSYn9HGLNmzyPM=
-gitlab.com/go-extension/http v0.0.0-20251006175957-3113a1e48242/go.mod h1:6/awBJ4BJt8gu67+suq78SD4aPhuCgPdS72u98YwpWU=
+gitlab.com/go-extension/http v0.0.0-20260118113043-f91863355c61 h1:g01jbky8NiBGkNT5UVem8s6+24pUJP+8tO2JonuH9CQ=
+gitlab.com/go-extension/http v0.0.0-20260118113043-f91863355c61/go.mod h1:3Lj2UlS1PObtuM72UBeldkN3RrYyKKBrStakR1rgv3k=
 gitlab.com/go-extension/rand v0.0.0-20240303103951-707937a049b5 h1:xQA0rfVPqW3G6dnb4qtgBdxr9XLu9vzDfdqKfLqGFXA=
 gitlab.com/go-extension/rand v0.0.0-20240303103951-707937a049b5/go.mod h1:nRmjyZOSF6N/6yuRl7ui9wKb1DjMX9ELGzOwELwWVSU=
-gitlab.com/go-extension/tls v0.0.0-20251218095625-a161feb36b6b h1:2fFFhXzK5MfHX/0vyqwqyZJwLXt0+OPIqskWsASUxzY=
-gitlab.com/go-extension/tls v0.0.0-20251218095625-a161feb36b6b/go.mod h1:eBPdG62l5Q/Nklxl2ChreZVVMun/CgwJPj/ll7ZpfcA=
+gitlab.com/go-extension/tls v0.0.0-20260118170437-0159a212eee9 h1:MG/jY0ygzO9dIVQDMc/A5hWZ66nRGbjJkG8OZTpLlww=
+gitlab.com/go-extension/tls v0.0.0-20260118170437-0159a212eee9/go.mod h1:ZpdC3P/kTh0KLQefFocvG4wF9r0xd2EejWqrb4bIFSo=
 gitlab.com/go-extension/utils v0.0.0-20251006173700-b62b19cda891 h1:b45Hl2gyHbV6GANcg/7BSZ0A0JUjq/gBEq+OeJlAuM0=
 gitlab.com/go-extension/utils v0.0.0-20251006173700-b62b19cda891/go.mod h1:Ywd71Frp71RHLytGD2PgcTyxX/nEpGcYh85CPFTz3Mg=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=

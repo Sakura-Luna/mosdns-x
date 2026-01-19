@@ -87,9 +87,9 @@ func Test_FallbackECS_fallback(t *testing.T) {
 			p2.Unlock()
 
 			qCtx := query_context.NewContext(new(dns.Msg), nil)
-			err = ExecChainNode(ctx, qCtx, WrapExecutable(fallbackECS))
-			// if tt.wantErr != (err != nil) {
-			if tt.wantErr && qCtx.R() != nil {
+			_ = ExecChainNode(ctx, qCtx, WrapExecutable(fallbackECS))
+			err = qCtx.Status()
+			if tt.wantErr != (err != nil) {
 				t.Fatalf("execCmd() error = %v, wantErr %v", err, tt.wantErr)
 			}
 

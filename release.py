@@ -25,7 +25,7 @@ envs = [
     [['GOOS', 'linux'], ['GOARCH', 'amd64']],
     [['GOOS', 'linux'], ['GOARCH', 'amd64'], ['GOAMD64', 'v3']],
 
-    [['GOOS', 'linux'], ['GOARCH', 'arm'], ['GOARM', '5']],
+    # [['GOOS', 'linux'], ['GOARCH', 'arm'], ['GOARM', '5']],
     [['GOOS', 'linux'], ['GOARCH', 'arm'], ['GOARM', '6']],
     [['GOOS', 'linux'], ['GOARCH', 'arm'], ['GOARM', '7']],
     [['GOOS', 'linux'], ['GOARCH', 'arm64']],
@@ -37,7 +37,7 @@ envs = [
 
     # [['GOOS', 'linux'], ['GOARCH', 'mips64'], ['GOMIPS64', 'hardfloat']],
     # [['GOOS', 'linux'], ['GOARCH', 'mips64'], ['GOMIPS64', 'softfloat']],
-    [['GOOS', 'linux'], ['GOARCH', 'mips64le'], ['GOMIPS64', 'hardfloat']],
+    # [['GOOS', 'linux'], ['GOARCH', 'mips64le'], ['GOMIPS64', 'hardfloat']],
     # [['GOOS', 'linux'], ['GOARCH', 'mips64le'], ['GOMIPS64', 'softfloat']],
 
     [['GOOS', 'linux'], ['GOARCH', 'ppc64le']],

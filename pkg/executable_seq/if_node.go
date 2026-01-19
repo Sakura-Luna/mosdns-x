@@ -64,12 +64,7 @@ func (b *ConditionNode) LinkNext(n ExecutableChainNode) {
 	}
 }
 
-func ParseConditionNode(
-	cfg *ConditionNodeConfig,
-	logger *zap.Logger,
-	execs map[string]Executable,
-	matchers map[string]Matcher,
-) (*ConditionNode, error) {
+func ParseConditionNode(cfg *ConditionNodeConfig, logger *zap.Logger, execs map[string]Executable, matchers map[string]Matcher) (*ConditionNode, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}

@@ -52,6 +52,7 @@ func (m *SubDomainMatcher[T]) Match(s string) (T, bool) {
 	for ds.Scan() {
 		label := ds.NextLabel()
 		if nextNode := currentNode.getChild(label); nextNode != nil {
+			// v 是规则末端标记, 确实是子域名优先
 			if nextNode.hasValue() {
 				v, ok = nextNode.getValue()
 			}

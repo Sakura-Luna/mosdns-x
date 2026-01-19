@@ -21,7 +21,7 @@ package query_summary
 
 import (
 	"context"
-	"strings"
+	"errors"
 	"time"
 
 	"go.uber.org/zap"
@@ -86,6 +86,9 @@ func newLogger(bp *coremain.BP, args *Args) coremain.Plugin {
 
 func (l *logger) Exec(ctx context.Context, qCtx *C.Context, next executable_seq.ExecutableChainNode) error {
 	err := executable_seq.ExecChainNode(ctx, qCtx, next)
+	if err == nil {
+		err = qCtx.Status()
+	}
 
 	q := qCtx.Q()
 	if len(q.Question) != 1 {
@@ -114,21 +117,20 @@ func (l *logger) Exec(ctx context.Context, qCtx *C.Context, next executable_seq.
 		zap.Int("resp_rcode", respRcode),
 		zap.Duration("elapsed", time.Since(qCtx.StartTime())))
 
-	var reason string
-	switch info := qCtx.From(); {
-	case info == "" && err == nil:
-		reason = "terminate prematurely"
-	case info != "" && l.args.Source:
-		inboundInfo = append(inboundInfo, zap.String("source", info))
-	}
-	if err != nil && strings.HasSuffix(err.Error(), "canceled") {
-		reason = "canceled by others"
-		err = nil
+	if l.args.Source {
+		source := qCtx.From()
+		if source == "" {
+			if errors.Is(err, context.Canceled) {
+				source = "cancel by others"
+				err = nil
+			} else if err == nil {
+				source = "terminate prematurely"
+			}
+		}
+		inboundInfo = append(inboundInfo, zap.String("source", source))
 	}
 	if err != nil {
-		inboundInfo = append(inboundInfo, zap.String("reason", err.Error()))
-	} else if l.args.Source && reason != "" {
-		inboundInfo = append(inboundInfo, zap.String("reason", reason))
+		inboundInfo = append(inboundInfo, zap.Error(err))
 	}
 	l.BP.L().Info(l.args.Msg, inboundInfo...)
 	return err

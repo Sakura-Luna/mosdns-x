@@ -22,6 +22,7 @@ package responsematcher
 import (
 	"context"
 	"io"
+	"slices"
 
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
@@ -42,6 +43,9 @@ func init() {
 
 	coremain.RegNewPresetPluginFunc("_valid_answer", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &hasValidAnswer{BP: bp}, nil
+	})
+	coremain.RegNewPresetPluginFunc("_valid_ip_answer", func(bp *coremain.BP) (coremain.Plugin, error) {
+		return &hasValidAnswer{BP: bp, strict: true}, nil
 	})
 	coremain.RegNewPresetPluginFunc("_empty_ip_answer", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &hasEmptyIPAnswer{BP: bp}, nil
@@ -116,6 +120,7 @@ func newResponseMatcher(bp *coremain.BP, args *Args) (m *responseMatcher, err er
 
 type hasValidAnswer struct {
 	*coremain.BP
+	strict bool
 }
 
 var _ coremain.MatcherPlugin = (*hasValidAnswer)(nil)
@@ -133,6 +138,9 @@ func (e *hasValidAnswer) match(qCtx *query_context.Context) (matched bool) {
 		qClass uint16
 	}
 
+	if !e.strict {
+		return slices.Contains([]int{0, 1, 3}, r.Rcode)
+	}
 	switch q.Question[0].Qtype {
 	case dns.TypeA, dns.TypeAAAA:
 		m := make(map[question]struct{}, len(q.Question))
@@ -146,10 +154,7 @@ func (e *hasValidAnswer) match(qCtx *query_context.Context) (matched bool) {
 				return true
 			}
 		}
-	default:
-		return r.Rcode == dns.RcodeSuccess
 	}
-
 	return false
 }
 

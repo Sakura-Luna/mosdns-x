@@ -72,9 +72,7 @@ type parallelECSResult struct {
 }
 
 func (p *ParallelNode) Exec(ctx context.Context, qCtx *query_context.Context, next ExecutableChainNode) error {
-	if err := p.exec(ctx, qCtx); err != nil {
-		return err
-	}
+	qCtx.SetStatus(p.exec(ctx, qCtx))
 	return ExecChainNode(ctx, qCtx, next)
 }
 

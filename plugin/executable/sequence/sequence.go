@@ -26,6 +26,7 @@ import (
 	"github.com/pmkol/mosdns-x/coremain"
 	"github.com/pmkol/mosdns-x/pkg/executable_seq"
 	"github.com/pmkol/mosdns-x/pkg/query_context"
+	"go.uber.org/zap"
 )
 
 const PluginType = "sequence"
@@ -54,7 +55,9 @@ func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
 func newSequencePlugin(bp *coremain.BP, args *Args) (*sequence, error) {
 	ecs, err := executable_seq.BuildExecutableLogicTree(args.Exec, bp.L(), bp.M().GetExecutables(), bp.M().GetMatchers())
 	if err != nil {
-		return nil, fmt.Errorf("cannot build sequence: %w", err)
+		err = fmt.Errorf("cannot build sequence: %w", err)
+		bp.L().Error("Init failed", zap.Error(err))
+		return nil, err
 	}
 
 	return &sequence{

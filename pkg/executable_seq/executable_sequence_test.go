@@ -293,8 +293,9 @@ exec:
 			for r := 0; r < 3; r++ {
 				for _, want := range tt.want {
 					qCtx := query_context.NewContext(new(dns.Msg), nil)
-					err = ExecChainNode(context.Background(), qCtx, ecs)
-					if want.err != nil && qCtx.R() != nil {
+					_ = ExecChainNode(context.Background(), qCtx, ecs)
+					err = qCtx.Status()
+					if (err != nil || want.err != nil) && !errors.Is(err, want.err) {
 						t.Errorf("Exec() error = %v, wantErr %v", err, want.err)
 						return
 					}

@@ -35,12 +35,7 @@ import (
 // (a / a slice of) string that map to an Executable in execs,
 // (a / a slice of) map[string]interface{}, which can be parsed to FallbackConfig, ParallelConfig or ConditionNodeConfig,
 // a []interface{} that contains all the above.
-func BuildExecutableLogicTree(
-	in interface{},
-	logger *zap.Logger,
-	execs map[string]Executable,
-	matchers map[string]Matcher,
-) (ExecutableChainNode, error) {
+func BuildExecutableLogicTree(in interface{}, logger *zap.Logger, execs map[string]Executable, matchers map[string]Matcher) (ExecutableChainNode, error) {
 	switch v := in.(type) {
 	case ExecutableChainNode:
 		return v, nil
@@ -109,12 +104,7 @@ func BuildExecutableLogicTree(
 	}
 }
 
-func parseIfBlockFromMap(
-	m map[string]interface{},
-	logger *zap.Logger,
-	execs map[string]Executable,
-	matchers map[string]Matcher,
-) (ExecutableChainNode, error) {
+func parseIfBlockFromMap(m map[string]interface{}, logger *zap.Logger, execs map[string]Executable, matchers map[string]Matcher) (ExecutableChainNode, error) {
 	conf := new(ConditionNodeConfig)
 	err := utils.WeakDecode(m, conf)
 	if err != nil {
@@ -129,12 +119,7 @@ func parseIfBlockFromMap(
 	return e, nil
 }
 
-func parseParallelNodeFromMap(
-	m map[string]interface{},
-	logger *zap.Logger,
-	execs map[string]Executable,
-	matchers map[string]Matcher,
-) (ExecutableChainNode, error) {
+func parseParallelNodeFromMap(m map[string]interface{}, logger *zap.Logger, execs map[string]Executable, matchers map[string]Matcher) (ExecutableChainNode, error) {
 	conf := new(ParallelConfig)
 	err := utils.WeakDecode(m, conf)
 	if err != nil {
@@ -148,12 +133,7 @@ func parseParallelNodeFromMap(
 	return WrapExecutable(e), nil
 }
 
-func parseFallbackNodeFromMap(
-	m map[string]interface{},
-	logger *zap.Logger,
-	execs map[string]Executable,
-	matchers map[string]Matcher,
-) (ExecutableChainNode, error) {
+func parseFallbackNodeFromMap(m map[string]interface{}, logger *zap.Logger, execs map[string]Executable, matchers map[string]Matcher) (ExecutableChainNode, error) {
 	conf := new(FallbackConfig)
 	err := utils.WeakDecode(m, conf)
 	if err != nil {
@@ -167,12 +147,7 @@ func parseFallbackNodeFromMap(
 	return WrapExecutable(e), nil
 }
 
-func parseLBNodeFromMap(
-	m map[string]interface{},
-	logger *zap.Logger,
-	execs map[string]Executable,
-	matchers map[string]Matcher,
-) (ExecutableChainNode, error) {
+func parseLBNodeFromMap(m map[string]interface{}, logger *zap.Logger, execs map[string]Executable, matchers map[string]Matcher) (ExecutableChainNode, error) {
 	conf := new(LBConfig)
 	err := utils.WeakDecode(m, conf)
 	if err != nil {

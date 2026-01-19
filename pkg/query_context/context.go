@@ -103,9 +103,10 @@ type Context struct {
 	id            uint32 // additional uint to distinguish duplicated msg
 	reqMeta       *RequestMeta
 
-	r     *dns.Msg
-	from  string
-	marks map[uint]struct{}
+	r      *dns.Msg
+	from   string
+	status error
+	marks  map[uint]struct{}
 }
 
 var (
@@ -182,6 +183,10 @@ func (ctx *Context) R() *dns.Msg {
 
 func (ctx *Context) From() string { return ctx.from }
 
+func (ctx *Context) Status() error {
+	return ctx.status
+}
+
 // SetResponse stores the response r to the context.
 // Note: It just stores the pointer of r. So the caller
 // shouldn't modify or read r after the call.
@@ -191,6 +196,10 @@ func (ctx *Context) SetResponse(r *dns.Msg) {
 
 func (ctx *Context) SetFrom(f string) {
 	ctx.from = f
+}
+
+func (ctx *Context) SetStatus(status error) {
+	ctx.status = status
 }
 
 // Id returns the Context id.

@@ -82,7 +82,8 @@ func Test_ParallelNode(t *testing.T) {
 
 			start := time.Now()
 			qCtx := query_context.NewContext(new(dns.Msg), nil)
-			err = ExecChainNode(ctx, qCtx, WrapExecutable(parallelNode))
+			_ = ExecChainNode(ctx, qCtx, WrapExecutable(parallelNode))
+			err = qCtx.Status()
 
 			if time.Since(start) > wantLatency {
 				t.Fatalf("execCmd() timeout: latency = %vms, want = %vms",
