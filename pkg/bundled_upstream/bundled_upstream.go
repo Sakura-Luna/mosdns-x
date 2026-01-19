@@ -93,7 +93,7 @@ func ExchangeParallel(ctx context.Context, qCtx *query_context.Context, upstream
 		case res := <-c:
 			if res.err != nil {
 				switch {
-				case errors.Is(res.err, context.Canceled):
+				case !errors.Is(res.err, context.Canceled):
 					msg := []zap.Field{qCtx.InfoField(), zap.String("addr", res.from.Address())}
 					if ip := res.from.IPAddress(); ip != "" {
 						msg = append(msg, zap.String("ip", ip))

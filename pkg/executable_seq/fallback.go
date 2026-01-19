@@ -150,7 +150,7 @@ func ParseFallbackNode(c *FallbackConfig, logger *zap.Logger, execs map[string]E
 }
 
 func (f *FallbackNode) Exec(ctx context.Context, qCtx *query_context.Context, next ExecutableChainNode) error {
-	_ = f.exec(ctx, qCtx)
+	qCtx.SetStatus(f.exec(ctx, qCtx))
 	return ExecChainNode(ctx, qCtx, next)
 }
 
@@ -161,7 +161,6 @@ func (f *FallbackNode) exec(ctx context.Context, qCtx *query_context.Context) er
 		}
 		return f.doPrimary(ctx, qCtx)
 	}
-	f.logger.Warn("secondary turned on", qCtx.InfoField())
 	return f.doFallback(ctx, qCtx)
 }
 
@@ -175,7 +174,7 @@ func (f *FallbackNode) exec(ctx context.Context, qCtx *query_context.Context) er
 func (f *FallbackNode) doPrimary(ctx context.Context, qCtx *query_context.Context) (err error) {
 	err = ExecChainNode(ctx, qCtx, f.primary)
 	if f.primaryST != nil {
-		if err != nil || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		if e := qCtx.Status(); qCtx.R() == nil && !errors.Is(e, context.Canceled) {
 			f.primaryST.update(1)
 		} else {
 			f.primaryST.update(0)
@@ -186,17 +185,17 @@ func (f *FallbackNode) doPrimary(ctx context.Context, qCtx *query_context.Contex
 }
 
 func makeDdlCtx(ctx context.Context, timeout time.Duration) (context.Context, func()) {
-	ddl, ok := ctx.Deadline()
-	if !ok {
-		ddl = time.Now().Add(timeout)
+	deadline := time.Now().Add(timeout)
+	if ddl, ok := ctx.Deadline(); !ok || ddl.After(deadline) {
+		return context.WithDeadline(ctx, deadline)
 	}
-	return context.WithDeadline(context.Background(), ddl)
+	return context.WithCancel(ctx)
 }
 
 func (f *FallbackNode) doFastFallback(ctx context.Context, qCtx *query_context.Context) (err error) {
 	var wg sync.WaitGroup
 	c := make(chan *parallelECSResult, 2)
-	taskCtx, cancel := context.WithCancel(ctx)
+	taskCtx, cancel := makeDdlCtx(ctx, parallelTimeout)
 	defer cancel()
 
 	primFailed := make(chan struct{}) // will be closed if primary returns an error.
@@ -206,10 +205,9 @@ func (f *FallbackNode) doFastFallback(ctx context.Context, qCtx *query_context.C
 	qCtxP := qCtx.Copy()
 	go func() {
 		defer wg.Done()
-		cCtx, cCancel := makeDdlCtx(taskCtx, parallelTimeout)
-		defer cCancel()
 
-		err := f.doPrimary(cCtx, qCtxP)
+		_ = f.doPrimary(taskCtx, qCtxP)
+		err := qCtxP.Status()
 		if err != nil || qCtxP.R() == nil {
 			close(primFailed)
 		} else {
@@ -240,9 +238,8 @@ func (f *FallbackNode) doFastFallback(ctx context.Context, qCtx *query_context.C
 			}
 		}
 
-		cCtx, cCancel := makeDdlCtx(taskCtx, parallelTimeout)
-		defer cCancel()
-		err := f.doSecondary(cCtx, qCtxS)
+		_ = f.doSecondary(taskCtx, qCtxS)
+		err := qCtxS.Status()
 		res := &parallelECSResult{qCtx: qCtxS, err: err, from: 2}
 
 		if f.alwaysStandby { // always standby
@@ -280,17 +277,16 @@ func (f *FallbackNode) doSecondary(ctx context.Context, qCtx *query_context.Cont
 func (f *FallbackNode) doFallback(ctx context.Context, qCtx *query_context.Context) error {
 	var wg sync.WaitGroup
 	c := make(chan *parallelECSResult, 2) // buf size is 2, avoid blocking.
-	taskCtx, cancel := context.WithCancel(ctx)
+	taskCtx, cancel := makeDdlCtx(ctx, parallelTimeout)
 	defer cancel()
 
 	wg.Add(1)
 	qCtxP := qCtx.Copy()
 	go func() {
 		defer wg.Done()
-		cCtx, cCancel := makeDdlCtx(taskCtx, parallelTimeout)
-		defer cCancel()
 
-		err := f.doPrimary(cCtx, qCtxP)
+		_ = f.doPrimary(taskCtx, qCtxP)
+		err := qCtxP.Status()
 		select {
 		case c <- &parallelECSResult{qCtx: qCtxP, err: err, from: 0}:
 		case <-taskCtx.Done():
@@ -301,10 +297,9 @@ func (f *FallbackNode) doFallback(ctx context.Context, qCtx *query_context.Conte
 	qCtxS := qCtx.Copy()
 	go func() {
 		defer wg.Done()
-		cCtx, cCancel := makeDdlCtx(taskCtx, parallelTimeout)
-		defer cCancel()
 
-		err := f.doSecondary(cCtx, qCtxS)
+		_ = f.doSecondary(taskCtx, qCtxS)
+		err := qCtxS.Status()
 		select {
 		case c <- &parallelECSResult{qCtx: qCtxS, err: err, from: 1}:
 		case <-taskCtx.Done():

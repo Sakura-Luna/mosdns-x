@@ -245,7 +245,7 @@ func (u *upstreamWrapper) Trusted() bool {
 // - handler.ContextStatusResponded: if it received a response.
 // - handler.ContextStatusServerFailed: if all upstreams failed.
 func (f *fastForward) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
-	_ = f.exec(ctx, qCtx)
+	qCtx.SetStatus(f.exec(ctx, qCtx))
 	return executable_seq.ExecChainNode(ctx, qCtx, next)
 }
 

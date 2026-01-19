@@ -73,6 +73,6 @@ func (lbn *LBNode) Exec(ctx context.Context, qCtx *query_context.Context, next E
 	}
 
 	nextIdx := atomic.AddUint32(&lbn.p, 1) % uint32(len(lbn.branchNode))
-	_ = ExecChainNode(ctx, qCtx, lbn.branchNode[nextIdx])
+	qCtx.SetStatus(ExecChainNode(ctx, qCtx, lbn.branchNode[nextIdx]))
 	return nil
 }

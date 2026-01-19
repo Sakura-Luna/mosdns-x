@@ -45,20 +45,23 @@ func asyncWait(ctx context.Context, qCtx *query_context.Context, logger *zap.Log
 
 		case res := <-c:
 			if res.err != nil {
-				logger.Warn("sequence failed", qCtx.InfoField(), zap.Int("sequence", res.from), zap.Error(res.err))
+				if errors.Is(res.err, context.Canceled) {
+					continue
+				}
+				logger.Warn("branch failed", qCtx.InfoField(), zap.Int("branch", res.from), zap.Error(res.err))
 				err = res.err
 				continue
 			}
 
 			if r := res.qCtx.R(); r != nil {
-				logger.Debug("sequence returned a response", qCtx.InfoField(), zap.Int("sequence", res.from))
+				logger.Debug("branch returned a response", qCtx.InfoField(), zap.Int("branch", res.from))
 				cancel()
 				qCtx.SetResponse(r)
 				qCtx.SetFrom(res.qCtx.From())
 				return nil
 			}
 
-			logger.Debug("sequence returned with an empty response", qCtx.InfoField(), zap.Int("sequence", res.from))
+			logger.Debug("branch returned with an empty response", qCtx.InfoField(), zap.Int("branch", res.from))
 		}
 	}
 	return err
