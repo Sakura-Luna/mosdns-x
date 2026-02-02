@@ -23,11 +23,18 @@ import (
 	"io"
 	"os"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 )
 
 type Matcher struct {
-	m map[dns.Question][]dns.RR
+	m map[Question][]dns.RR
+}
+
+type Question struct {
+	Name  string
+	Type  uint16
+	Class uint16
 }
 
 func (m *Matcher) LoadFile(s string) error {
@@ -42,7 +49,7 @@ func (m *Matcher) LoadFile(s string) error {
 
 func (m *Matcher) Load(r io.Reader) error {
 	if m.m == nil {
-		m.m = make(map[dns.Question][]dns.RR)
+		m.m = make(map[Question][]dns.RR)
 	}
 
 	parser := dns.NewZoneParser(r, "", "")
@@ -53,31 +60,34 @@ func (m *Matcher) Load(r io.Reader) error {
 			break
 		}
 		h := rr.Header()
-		q := dns.Question{
-			Name:   h.Name,
-			Qtype:  h.Rrtype,
-			Qclass: h.Class,
+		q := Question{
+			Name:  h.Name,
+			Type:  dns.RRToType(rr),
+			Class: h.Class,
 		}
 		m.m[q] = append(m.m[q], rr)
 	}
 	return parser.Err()
 }
 
-func (m *Matcher) Search(q dns.Question) []dns.RR {
+func (m *Matcher) Search(q Question) []dns.RR {
 	return m.m[q]
 }
 
 func (m *Matcher) Reply(q *dns.Msg) *dns.Msg {
 	var r *dns.Msg
-	for _, question := range q.Question {
-		rr := m.Search(question)
-		if rr != nil {
-			if r == nil {
-				r = new(dns.Msg)
-				r.SetReply(q)
-			}
-			r.Answer = append(r.Answer, rr...)
+	for _, quest := range q.Question {
+		hdr := quest.Header()
+		qt := Question{Name: hdr.Name, Type: dns.RRToType(quest), Class: hdr.Class}
+		rr := m.Search(qt)
+		if rr == nil {
+			continue
 		}
+		if r == nil {
+			r = new(dns.Msg)
+			dnsutil.SetReply(r, q)
+		}
+		r.Answer = append(r.Answer, rr...)
 	}
 	return r
 }

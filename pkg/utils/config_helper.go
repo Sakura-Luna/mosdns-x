@@ -20,17 +20,19 @@
 package utils
 
 import (
+	"cmp"
+
 	"github.com/mitchellh/mapstructure"
-	"golang.org/x/exp/constraints"
 )
 
-func SetDefaultNum[K constraints.Integer | constraints.Float](p *K, d K) {
-	if *p == 0 {
+func SetDefaultNum[K cmp.Ordered](p *K, d K) {
+	var zero K
+	if *p == zero {
 		*p = d
 	}
 }
 
-func CheckNumRange[K constraints.Integer | constraints.Float](v, min, max K) bool {
+func CheckNumRange[K cmp.Ordered](v, min, max K) bool {
 	if v < min || v > max {
 		return false
 	}
@@ -38,7 +40,7 @@ func CheckNumRange[K constraints.Integer | constraints.Float](v, min, max K) boo
 }
 
 // WeakDecode decodes args from config to output.
-func WeakDecode(in map[string]interface{}, output interface{}) error {
+func WeakDecode(in map[string]any, output any) error {
 	config := &mapstructure.DecoderConfig{
 		ErrorUnused:      true,
 		Result:           output,

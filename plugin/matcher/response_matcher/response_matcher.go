@@ -24,7 +24,7 @@ import (
 	"io"
 	"slices"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 	"go.uber.org/zap"
 
 	"github.com/pmkol/mosdns-x/coremain"
@@ -55,7 +55,7 @@ func init() {
 var _ coremain.MatcherPlugin = (*responseMatcher)(nil)
 
 type Args struct {
-	RCode []int    `yaml:"rcode"`
+	RCode []uint16 `yaml:"rcode"`
 	IP    []string `yaml:"ip"`
 	CNAME []string `yaml:"cname"`
 }
@@ -139,17 +139,16 @@ func (e *hasValidAnswer) match(qCtx *query_context.Context) (matched bool) {
 	}
 
 	if !e.strict {
-		return slices.Contains([]int{0, 1, 3}, r.Rcode)
+		return slices.Contains([]uint16{0, 1, 3}, r.Rcode)
 	}
-	switch q.Question[0].Qtype {
+	switch dns.RRToType(q.Question[0]) {
 	case dns.TypeA, dns.TypeAAAA:
 		m := make(map[question]struct{}, len(q.Question))
 		for _, quest := range q.Question {
-			m[question{quest.Qtype, quest.Qclass}] = struct{}{}
+			m[question{dns.RRToType(quest), quest.Header().Class}] = struct{}{}
 		}
 		for _, rr := range r.Answer {
-			h := rr.Header()
-			q := question{h.Rrtype, h.Class}
+			q := question{dns.RRToType(rr), rr.Header().Class}
 			if _, ok := m[q]; ok {
 				return true
 			}
@@ -176,13 +175,16 @@ func (e *hasEmptyIPAnswer) match(qCtx *query_context.Context) (matched bool) {
 
 	q := qCtx.Q()
 
-	switch q.Question[0].Qtype {
+	switch dns.RRToType(q.Question[0]) {
 	case dns.TypeA, dns.TypeAAAA:
-		if len(r.Answer) == 0 {
-			return true
+		for _, rr := range r.Answer {
+			switch dns.RRToType(rr) {
+			case dns.TypeA, dns.TypeAAAA:
+				return false
+			}
 		}
 	}
-	return false
+	return true
 }
 
 func (e *hasEmptyIPAnswer) Match(_ context.Context, qCtx *query_context.Context) (matched bool, err error) {

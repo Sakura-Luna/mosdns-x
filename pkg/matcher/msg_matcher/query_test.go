@@ -21,11 +21,10 @@ package msg_matcher
 
 import (
 	"context"
-	"net"
 	"net/netip"
 	"testing"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
 	"github.com/pmkol/mosdns-x/pkg/matcher/domain"
@@ -87,19 +86,18 @@ func TestClientECSMatcher_Match(t *testing.T) {
 	}
 	nl.Sort()
 
-	msg := new(dns.Msg)
-	msgWithoutOPT := msg
-	msg = new(dns.Msg)
-	msg.SetEdns0(512, false)
-	msgWithOPT := msg
-	msg = new(dns.Msg)
-	msg.SetEdns0(512, false)
-	opt := msg.IsEdns0()
-	dnsutils.AddECS(opt, &dns.EDNS0_SUBNET{Address: net.ParseIP("127.0.0.1")}, false)
-	msg1271 := msg
-	msg1281 := msg.Copy()
-	opt = msg1281.IsEdns0()
-	dnsutils.AddECS(opt, &dns.EDNS0_SUBNET{Address: net.ParseIP("128.0.0.1")}, true)
+	msgNoOPT := new(dns.Msg)
+	msgWithOPT := msgNoOPT.Copy()
+	dnsutils.UpgradeEDNS0(msgWithOPT)
+
+	msg1271 := msgNoOPT.Copy()
+	addr, _ := netip.ParseAddr("127.0.0.1")
+	dnsutils.AddECS(msg1271, &dns.SUBNET{Address: addr}, false)
+
+	msg1281 := msgNoOPT.Copy()
+	addr2, _ := netip.ParseAddr("128.0.0.1")
+	dnsutils.AddECS(msg1281, &dns.SUBNET{Address: addr}, false)
+	dnsutils.AddECS(msg1281, &dns.SUBNET{Address: addr2}, true)
 
 	tests := []struct {
 		name        string
@@ -111,7 +109,7 @@ func TestClientECSMatcher_Match(t *testing.T) {
 		{"matched", nl, C.NewContext(msg1271, nil), true, false},
 		{"not matched", nl, C.NewContext(msg1281, nil), false, false},
 		{"no ecs", nl, C.NewContext(msgWithOPT, nil), false, false},
-		{"no opt", nl, C.NewContext(msgWithoutOPT, nil), false, false},
+		{"no opt", nl, C.NewContext(msgNoOPT, nil), false, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -133,43 +131,41 @@ func TestQNameMatcher_Match(t *testing.T) {
 	dm.Add("com.", struct{}{})
 
 	qm := NewQNameMatcher(dm)
-	m := new(dns.Msg)
-	m.SetQuestion("example.com.", dns.TypeA)
+	m := dns.NewMsg("example.com.", dns.TypeA)
 	if !qm.MatchMsg(m) {
 		t.Fatal()
 	}
 
-	m.SetQuestion("example.xxx.", dns.TypeA)
+	m = dns.NewMsg("example.xxx.", dns.TypeA)
 	if qm.MatchMsg(m) {
 		t.Fatal()
 	}
 }
 
 func TestQTypeMatcher_Match(t *testing.T) {
-	em := elem.NewIntMatcher([]int{int(dns.TypeA)})
+	em := elem.NewIntMatcher([]uint16{dns.TypeA})
 	qm := NewQTypeMatcher(em)
-	m := new(dns.Msg)
-	m.SetQuestion(".", dns.TypeA)
+	m := dns.NewMsg(".", dns.TypeA)
 	if !qm.MatchMsg(m) {
 		t.Fatal()
 	}
 
-	m.SetQuestion(".", dns.TypeAAAA)
+	m = dns.NewMsg(".", dns.TypeAAAA)
 	if qm.MatchMsg(m) {
 		t.Fatal()
 	}
 }
 
 func TestQClassMatcher_Match(t *testing.T) {
-	em := elem.NewIntMatcher([]int{dns.ClassINET})
+	em := elem.NewIntMatcher([]uint16{dns.ClassINET})
 	qm := NewQClassMatcher(em)
 	m := new(dns.Msg)
-	m.Question = []dns.Question{{Name: ".", Qtype: dns.TypeA, Qclass: dns.ClassINET}}
+	m.Question = []dns.RR{&dns.A{Hdr: dns.Header{Name: ".", Class: dns.ClassINET}}}
 	if !qm.MatchMsg(m) {
 		t.Fatal()
 	}
 
-	m.Question = []dns.Question{{Name: ".", Qtype: dns.TypeA, Qclass: dns.ClassANY}}
+	m.Question = []dns.RR{&dns.A{Hdr: dns.Header{Name: ".", Class: dns.ClassANY}}}
 	if qm.MatchMsg(m) {
 		t.Fatal()
 	}

@@ -24,7 +24,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 	"go.uber.org/zap"
 
 	"github.com/pmkol/mosdns-x/pkg/query_context"

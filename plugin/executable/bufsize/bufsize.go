@@ -34,7 +34,7 @@ func init() {
 }
 
 type Args struct {
-	Size uint16 `yaml:"size"` // The maximum UDP Size. Default value is 512, and the value should be within 512 - 4096.
+	Size uint16 `yaml:"size"` // The maximum UDP Size. Default nothing to do, and the value should be (512, 4096].
 }
 
 var _ coremain.ExecutablePlugin = (*bufSize)(nil)
@@ -45,8 +45,8 @@ type bufSize struct {
 }
 
 func (b *bufSize) getSize() uint16 {
-	if b.size < 512 {
-		return 512
+	if b.size <= 512 {
+		return 0
 	}
 	if b.size > 4096 {
 		return 4096
@@ -56,10 +56,10 @@ func (b *bufSize) getSize() uint16 {
 
 func (b *bufSize) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
 	q := qCtx.Q()
-	if opt := q.IsEdns0(); opt != nil {
+	if q.IsEdns0() {
 		maxSize := b.getSize()
-		if opt.UDPSize() > maxSize {
-			opt.SetUDPSize(maxSize)
+		if maxSize > 0 && q.UDPSize > maxSize {
+			q.UDPSize = maxSize
 		}
 	}
 

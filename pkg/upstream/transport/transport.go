@@ -27,7 +27,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 	"go.uber.org/zap"
 
 	"github.com/pmkol/mosdns-x/pkg/utils"
@@ -437,13 +437,13 @@ func (dc *dnsConn) exchangeConnReuse(ctx context.Context, q *dns.Msg) (*dns.Msg,
 }
 
 func (dc *dnsConn) exchangePipeline(ctx context.Context, q *dns.Msg, allocatedQid uint16) (*dns.Msg, error) {
-	qSend := shadowCopy(q)
-	qSend.Id = allocatedQid
+	qSend := q.Copy()
+	qSend.ID = allocatedQid
 	r, err := dc.exchange(ctx, qSend)
 	if err != nil {
 		return nil, err
 	}
-	r.Id = q.Id
+	r.ID = q.ID
 	return r, nil
 }
 
@@ -456,7 +456,7 @@ func (dc *dnsConn) exchange(ctx context.Context, q *dns.Msg) (*dns.Msg, error) {
 		return nil, ctx.Err()
 	}
 
-	qid := q.Id
+	qid := q.ID
 	resChan := make(chan *dns.Msg, 1)
 	dc.addQueueC(qid, resChan)
 	defer dc.deleteQueueC(qid)
@@ -512,7 +512,7 @@ func (dc *dnsConn) readLoop() {
 		}
 		dc.updateReadTime()
 
-		resChan := dc.getQueueC(r.Id)
+		resChan := dc.getQueueC(r.ID)
 		if resChan != nil {
 			select {
 			case resChan <- r: // resChan has buffer

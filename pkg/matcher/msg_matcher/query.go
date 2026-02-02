@@ -21,9 +21,8 @@ package msg_matcher
 
 import (
 	"context"
-	"net/netip"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
 	"github.com/pmkol/mosdns-x/pkg/matcher/domain"
@@ -57,8 +56,8 @@ func NewClientECSMatcher(ipMatcher netlist.Matcher) *ClientECSMatcher {
 }
 
 func (m *ClientECSMatcher) Match(_ context.Context, qCtx *query_context.Context) (matched bool, err error) {
-	if ecs := dnsutils.GetMsgECS(qCtx.Q()); ecs != nil {
-		addr, _ := netip.AddrFromSlice(ecs.Address)
+	if ecs := dnsutils.GetECS(qCtx.Q()); ecs != nil {
+		addr := ecs.Address
 		return m.ipMatcher.Match(addr)
 	}
 	return false, nil
@@ -78,7 +77,7 @@ func (m *QNameMatcher) Match(_ context.Context, qCtx *query_context.Context) (ma
 
 func (m *QNameMatcher) MatchMsg(msg *dns.Msg) bool {
 	for i := range msg.Question {
-		_, ok := m.domainMatcher.Match(msg.Question[i].Name)
+		_, ok := m.domainMatcher.Match(msg.Question[i].Header().Name)
 		if ok {
 			return true
 		}
@@ -100,7 +99,7 @@ func (m *QTypeMatcher) Match(_ context.Context, qCtx *query_context.Context) (ma
 
 func (m *QTypeMatcher) MatchMsg(msg *dns.Msg) bool {
 	for i := range msg.Question {
-		if m.elemMatcher.Match(int(msg.Question[i].Qtype)) {
+		if m.elemMatcher.Match(dns.RRToType(msg.Question[i])) {
 			return true
 		}
 	}
@@ -121,7 +120,7 @@ func (m *QClassMatcher) Match(_ context.Context, qCtx *query_context.Context) (m
 
 func (m *QClassMatcher) MatchMsg(msg *dns.Msg) bool {
 	for i := range msg.Question {
-		if m.elemMatcher.Match(int(msg.Question[i].Qclass)) {
+		if m.elemMatcher.Match(msg.Question[i].Header().Class) {
 			return true
 		}
 	}

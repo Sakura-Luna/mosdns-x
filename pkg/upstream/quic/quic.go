@@ -24,7 +24,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 	"github.com/quic-go/quic-go"
 
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
@@ -150,7 +150,7 @@ func (h *Upstream) Close() error {
 }
 
 func (h *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, error) {
-	q.Id = 0
+	// q.Id = 0
 	var err error
 	for range 3 {
 		var conn *Conn

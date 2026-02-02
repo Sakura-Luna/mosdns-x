@@ -25,7 +25,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
+	"codeberg.org/miekg/dns/rdata"
 	"go.uber.org/zap"
 
 	"github.com/pmkol/mosdns-x/coremain"
@@ -61,7 +63,7 @@ func newRedirect(bp *coremain.BP, args *Args) (*redirectPlugin, error) {
 		if len(f) != 2 {
 			return "", "", fmt.Errorf("redirect rule must have 2 fields, but got %d", len(f))
 		}
-		return f[0], dns.Fqdn(f[1]), nil
+		return f[0], dnsutil.Fqdn(f[1]), nil
 	}
 	staticMatcher := domain.NewMixMatcher[string]()
 	staticMatcher.SetDefaultMatcher(domain.MatcherFull)
@@ -91,36 +93,35 @@ func newRedirect(bp *coremain.BP, args *Args) (*redirectPlugin, error) {
 
 func (r *redirectPlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
 	q := qCtx.Q()
-	if len(q.Question) != 1 || q.Question[0].Qclass != dns.ClassINET {
+	if len(q.Question) != 1 || q.Question[0].Header().Class != dns.ClassINET {
 		return executable_seq.ExecChainNode(ctx, qCtx, next)
 	}
 
-	orgQName := q.Question[0].Name
+	orgQName := q.Question[0].Header().Name
 	redirectTarget, ok := r.m.Match(orgQName)
 	if !ok {
 		return executable_seq.ExecChainNode(ctx, qCtx, next)
 	}
 
-	q.Question[0].Name = redirectTarget
+	q.Question[0].Header().Name = redirectTarget
 	err := executable_seq.ExecChainNode(ctx, qCtx, next)
 	if r := qCtx.R(); r != nil {
 		// Restore original query name.
 		for i := range r.Question {
-			if r.Question[i].Name == redirectTarget {
-				r.Question[i].Name = orgQName
+			if r.Question[i].Header().Name == redirectTarget {
+				r.Question[i].Header().Name = orgQName
 			}
 		}
 
 		// Insert a CNAME record.
 		newAns := make([]dns.RR, 1, len(r.Answer)+1)
 		newAns[0] = &dns.CNAME{
-			Hdr: dns.RR_Header{
-				Name:   orgQName,
-				Rrtype: dns.TypeCNAME,
-				Class:  dns.ClassINET,
-				Ttl:    1,
+			Hdr: dns.Header{
+				Name:  orgQName,
+				Class: dns.ClassINET,
+				TTL:   1,
 			},
-			Target: redirectTarget,
+			CNAME: rdata.CNAME{Target: redirectTarget},
 		}
 		newAns = append(newAns, r.Answer...)
 		r.Answer = newAns

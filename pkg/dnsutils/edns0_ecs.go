@@ -20,64 +20,49 @@
 package dnsutils
 
 import (
-	"net"
+	"net/netip"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 )
 
-func GetMsgECS(m *dns.Msg) (e *dns.EDNS0_SUBNET) {
-	opt := m.IsEdns0()
-	if opt == nil { // no opt, no ecs
-		return nil
-	}
-	return GetECS(opt)
-}
-
-// RemoveMsgECS removes the *dns.EDNS0_SUBNET record in m.
-func RemoveMsgECS(m *dns.Msg) {
-	opt := m.IsEdns0()
-	if opt == nil { // no opt, no ecs
-		return
-	}
-	RemoveECS(opt)
-}
-
-func GetECS(opt *dns.OPT) (e *dns.EDNS0_SUBNET) {
-	for o := range opt.Option {
-		if opt.Option[o].Option() == dns.EDNS0SUBNET {
-			return opt.Option[o].(*dns.EDNS0_SUBNET)
-		}
-	}
-	return nil
-}
-
-func RemoveECS(opt *dns.OPT) {
-	for i := range opt.Option {
-		if opt.Option[i].Option() == dns.EDNS0SUBNET {
-			opt.Option = append(opt.Option[:i], opt.Option[i+1:]...)
+// RemoveECS removes the *dns.SUBNET record in m.
+func RemoveECS(m *dns.Msg) {
+	for i, opt := range m.Pseudo {
+		if dns.RRToCode(opt.(dns.EDNS0)) == dns.CodeSUBNET {
+			m.Pseudo = append(m.Pseudo[:i], m.Pseudo[i+1:]...)
 			return
 		}
 	}
 	return
 }
 
+func GetECS(m *dns.Msg) (e *dns.SUBNET) {
+	for _, opt := range m.Pseudo {
+		if dns.RRToCode(opt.(dns.EDNS0)) == dns.CodeSUBNET {
+			return opt.(*dns.SUBNET)
+		}
+	}
+	return nil
+}
+
 // AddECS adds ecs to opt.
-func AddECS(opt *dns.OPT, ecs *dns.EDNS0_SUBNET, overwrite bool) (newECS bool) {
-	for o := range opt.Option {
-		if opt.Option[o].Option() == dns.EDNS0SUBNET {
+func AddECS(m *dns.Msg, ecs *dns.SUBNET, overwrite bool) (newECS bool) {
+	ps := m.Pseudo
+	for i, opt := range ps {
+		if dns.RRToCode(opt.(dns.EDNS0)) == dns.CodeSUBNET {
 			if overwrite {
-				opt.Option[o] = ecs
+				m.Pseudo[i] = ecs
 				return false
 			}
 			return false
 		}
 	}
-	opt.Option = append(opt.Option, ecs)
+	m.Pseudo = append(ps, ecs)
 	return true
 }
 
-func NewEDNS0Subnet(ip net.IP, mask uint8, v6 bool) *dns.EDNS0_SUBNET {
-	edns0Subnet := new(dns.EDNS0_SUBNET)
+func NewEDNS0Subnet(ip netip.Addr, mask uint8, v6 bool) *dns.SUBNET {
+	edns0Subnet := new(dns.SUBNET)
 	// edns family: https://www.iana.org/assignments/address-family-numbers/address-family-numbers.xhtml
 	// ipv4 = 1
 	// ipv6 = 2
@@ -87,14 +72,16 @@ func NewEDNS0Subnet(ip net.IP, mask uint8, v6 bool) *dns.EDNS0_SUBNET {
 		edns0Subnet.Family = 2
 	}
 
-	edns0Subnet.SourceNetmask = mask
-	edns0Subnet.Code = dns.EDNS0SUBNET
+	edns0Subnet.Netmask = mask
+	if !ip.IsValid() {
+		panic("Invalid IP")
+	}
 	edns0Subnet.Address = ip
 
 	// SCOPE PREFIX-LENGTH, an unsigned octet representing the leftmost
 	// number of significant bits of ADDRESS that the response covers.
 	// In queries, it MUST be set to 0.
 	// https://tools.ietf.org/html/rfc7871
-	edns0Subnet.SourceScope = 0
+	edns0Subnet.Scope = 0
 	return edns0Subnet
 }

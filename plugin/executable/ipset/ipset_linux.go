@@ -23,10 +23,9 @@ package ipset
 
 import (
 	"context"
-	"fmt"
 	"net/netip"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 	"github.com/nadoo/ipset"
 	"go.uber.org/zap"
 
@@ -86,10 +85,7 @@ func (p *ipsetPlugin) addIPSet(r *dns.Msg) error {
 			if len(p.args.SetName4) == 0 {
 				continue
 			}
-			addr, ok := netip.AddrFromSlice(rr.A.To4())
-			if !ok {
-				return fmt.Errorf("invalid A record with ip: %s", rr.A)
-			}
+			addr := rr.A.Addr
 			if err := ipset.AddPrefix(p.nl, p.args.SetName4, netip.PrefixFrom(addr, p.args.Mask4)); err != nil {
 				return err
 			}
@@ -98,10 +94,7 @@ func (p *ipsetPlugin) addIPSet(r *dns.Msg) error {
 			if len(p.args.SetName6) == 0 {
 				continue
 			}
-			addr, ok := netip.AddrFromSlice(rr.AAAA.To16())
-			if !ok {
-				return fmt.Errorf("invalid AAAA record with ip: %s", rr.AAAA)
-			}
+			addr := rr.AAAA.Addr
 			if err := ipset.AddPrefix(p.nl, p.args.SetName6, netip.PrefixFrom(addr, p.args.Mask6)); err != nil {
 				return err
 			}

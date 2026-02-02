@@ -29,7 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
 	"github.com/pmkol/mosdns-x/pkg/upstream/transport"
@@ -214,8 +214,10 @@ func (u *Upstream) reader(conn net.Conn) {
 
 		if n > 0 {
 			msg := new(dns.Msg)
-			if err := msg.Unpack(b[:n]); err == nil {
-				u.removePendingAndNotify(msg.Id, msg)
+			msg.Data = make([]byte, n)
+			copy(msg.Data, b[:n])
+			if err := msg.Unpack(); err == nil {
+				u.removePendingAndNotify(msg.ID, msg)
 			}
 		}
 	}
@@ -308,7 +310,7 @@ func (u *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, e
 		return nil, errors.New("udp upstream closed")
 	}
 
-	origID := q.Id
+	origID := q.ID
 	if err := u.ensureConn(ctx); err != nil {
 		return nil, err
 	}
@@ -333,7 +335,7 @@ func (u *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, e
 		dlSet = true
 	}
 	cq := q.Copy()
-	cq.Id = id
+	cq.ID = id
 	_, err = dnsutils.WriteMsgToUDP(conn, cq)
 	if dlSet {
 		_ = conn.SetWriteDeadline(time.Time{})
@@ -364,10 +366,10 @@ func (u *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, e
 			if err != nil {
 				return nil, err
 			}
-			resp.Id = origID
+			resp.ID = origID
 			return resp, nil
 		}
-		resp.Id = origID
+		resp.ID = origID
 		return resp, nil
 	case <-ctx.Done():
 		return nil, ctx.Err()

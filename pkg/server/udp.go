@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 	"go.uber.org/zap"
 
 	"github.com/pmkol/mosdns-x/pkg/pool"
@@ -81,8 +81,10 @@ func (s *Server) ServeUDP(c net.PacketConn) error {
 		clientAddr := utils.GetAddrFromAddr(remoteAddr)
 
 		q := new(dns.Msg)
-		if err := q.Unpack(rb[:n]); err != nil {
-			s.opts.Logger.Warn("invalid msg", zap.Error(err), zap.Binary("msg", rb[:n]), zap.Stringer("from", remoteAddr))
+		q.Data = make([]byte, n)
+		copy(q.Data, rb[:n])
+		if err := q.Unpack(); err != nil {
+			s.opts.Logger.Warn("invalid msg", zap.Error(err), zap.Binary("msg", q.Data))
 			continue
 		}
 
@@ -97,30 +99,17 @@ func (s *Server) ServeUDP(c net.PacketConn) error {
 				return
 			}
 			if r != nil {
-				r.Truncate(getUDPSize(q))
-				b, buf, err := pool.PackBuffer(r)
+				err := r.Pack()
 				if err != nil {
 					s.opts.Logger.Error("failed to unpack handler's response", zap.Error(err), zap.Stringer("msg", r))
 					return
 				}
-				defer buf.Release()
-				if _, err := cmc.writeTo(b, localAddr, ifIndex, remoteAddr); err != nil {
-					s.opts.Logger.Warn("failed to write response", zap.Stringer("client", remoteAddr), zap.Error(err))
+				if _, err := cmc.writeTo(r.Data, localAddr, ifIndex, remoteAddr); err != nil {
+					s.opts.Logger.Warn("failed to write response", zap.Error(err))
 				}
 			}
 		}()
 	}
-}
-
-func getUDPSize(m *dns.Msg) int {
-	var s uint16
-	if opt := m.IsEdns0(); opt != nil {
-		s = opt.UDPSize()
-	}
-	if s < dns.MinMsgSize {
-		s = dns.MinMsgSize
-	}
-	return int(s)
 }
 
 // newDummyCmc returns a dummyCmcWrapper.

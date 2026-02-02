@@ -30,7 +30,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 	"go.uber.org/zap"
 
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
@@ -299,8 +299,7 @@ func TestTransport_Exchange(t *testing.T) {
 
 			// Test err first.
 			if tt.wantErr {
-				q := new(dns.Msg)
-				q.SetQuestion(".", dns.TypeA)
+				q := dns.NewMsg(".", dns.TypeA)
 				_, err := transport.ExchangeContext(ctx, q)
 				if err == nil {
 					t.Fatal("want err, but got nil err")
@@ -316,9 +315,8 @@ func TestTransport_Exchange(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					randSleepMs(100)
-					q := new(dns.Msg)
 					qName := fmt.Sprintf("%d.", i)
-					q.SetQuestion(qName, dns.TypeA)
+					q := dns.NewMsg(qName, dns.TypeA)
 					ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*500)
 					defer cancel()
 
@@ -328,7 +326,7 @@ func TestTransport_Exchange(t *testing.T) {
 						return
 					}
 
-					if gotName := r.Question[0].Name; gotName != qName {
+					if gotName := r.Question[0].Header().Name; gotName != qName {
 						t.Errorf("Exchange() gotName = %v, want %v", gotName, qName)
 					}
 				}()

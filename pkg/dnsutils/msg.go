@@ -20,14 +20,9 @@
 package dnsutils
 
 import (
-	"encoding/binary"
-	"strconv"
-	"strings"
-
-	"github.com/miekg/dns"
-
-	"github.com/pmkol/mosdns-x/pkg/pool"
-	"github.com/pmkol/mosdns-x/pkg/utils"
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
+	"codeberg.org/miekg/dns/rdata"
 )
 
 // GetMinimalTTL returns the minimal ttl of this msg.
@@ -37,12 +32,8 @@ func GetMinimalTTL(m *dns.Msg) uint32 {
 	hasRecord := false
 	for _, section := range [...][]dns.RR{m.Answer, m.Ns, m.Extra} {
 		for _, rr := range section {
-			hdr := rr.Header()
-			if hdr.Rrtype == dns.TypeOPT {
-				continue // opt record ttl is not ttl.
-			}
 			hasRecord = true
-			ttl := hdr.Ttl
+			ttl := rr.Header().TTL
 			if ttl < minTTL {
 				minTTL = ttl
 			}
@@ -59,21 +50,9 @@ func GetMinimalTTL(m *dns.Msg) uint32 {
 func SetTTL(m *dns.Msg, ttl uint32) {
 	for _, section := range [...][]dns.RR{m.Answer, m.Ns, m.Extra} {
 		for _, rr := range section {
-			hdr := rr.Header()
-			if hdr.Rrtype == dns.TypeOPT {
-				continue // opt record ttl is not ttl.
-			}
-			hdr.Ttl = ttl
+			rr.Header().TTL = ttl
 		}
 	}
-}
-
-func ApplyMaximumTTL(m *dns.Msg, ttl uint32) {
-	applyTTL(m, ttl, true)
-}
-
-func ApplyMinimalTTL(m *dns.Msg, ttl uint32) {
-	applyTTL(m, ttl, false)
 }
 
 // SubtractTTL subtract delta from every m's RR.
@@ -83,13 +62,10 @@ func SubtractTTL(m *dns.Msg, delta uint32) (overflowed bool) {
 	for _, section := range [...][]dns.RR{m.Answer, m.Ns, m.Extra} {
 		for _, rr := range section {
 			hdr := rr.Header()
-			if hdr.Rrtype == dns.TypeOPT {
-				continue // opt record ttl is not ttl.
-			}
-			if ttl := hdr.Ttl; ttl > delta {
-				hdr.Ttl = ttl - delta
+			if ttl := hdr.TTL; ttl > delta {
+				hdr.TTL = ttl - delta
 			} else {
-				hdr.Ttl = 1
+				hdr.TTL = 1
 				overflowed = true
 			}
 		}
@@ -97,49 +73,28 @@ func SubtractTTL(m *dns.Msg, delta uint32) (overflowed bool) {
 	return
 }
 
-func applyTTL(m *dns.Msg, ttl uint32, maximum bool) {
+func ApplyTTL(m *dns.Msg, max uint32, min uint32) {
 	for _, section := range [...][]dns.RR{m.Answer, m.Ns, m.Extra} {
 		for _, rr := range section {
 			hdr := rr.Header()
-			if hdr.Rrtype == dns.TypeOPT {
-				continue // opt record ttl is not ttl.
-			}
-			if maximum {
-				if hdr.Ttl > ttl {
-					hdr.Ttl = ttl
-				}
-			} else {
-				if hdr.Ttl < ttl {
-					hdr.Ttl = ttl
-				}
+			if max > 0 && hdr.TTL > max {
+				hdr.TTL = max
+			} else if min > 0 && hdr.TTL < min {
+				hdr.TTL = min
 			}
 		}
 	}
 }
 
-func uint16Conv(u uint16, m map[uint16]string) string {
-	if s, ok := m[u]; ok {
-		return s
-	}
-	return strconv.Itoa(int(u))
-}
-
-func QclassToString(u uint16) string {
-	return uint16Conv(u, dns.ClassToString)
-}
-
-func QtypeToString(u uint16) string {
-	return uint16Conv(u, dns.TypeToString)
-}
-
-func GenEmptyReply(q *dns.Msg, rcode int) *dns.Msg {
+func GenEmptyReply(q *dns.Msg, rcode uint16) *dns.Msg {
 	r := new(dns.Msg)
-	r.SetRcode(q, rcode)
+	dnsutil.SetReply(r, q)
+	r.Rcode = rcode
 	r.RecursionAvailable = true
 
 	var name string
 	if len(q.Question) > 1 {
-		name = q.Question[0].Name
+		name = q.Question[0].Header().Name
 	} else {
 		name = "."
 	}
@@ -150,55 +105,57 @@ func GenEmptyReply(q *dns.Msg, rcode int) *dns.Msg {
 
 func FakeSOA(name string) *dns.SOA {
 	return &dns.SOA{
-		Hdr: dns.RR_Header{
-			Name:   name,
-			Rrtype: dns.TypeSOA,
-			Class:  dns.ClassINET,
-			Ttl:    300,
+		Hdr: dns.Header{
+			Name:  name,
+			Class: dns.ClassINET,
+			TTL:   300,
 		},
-		Ns:      "fake-ns.mosdns.fake.root.",
-		Mbox:    "fake-mbox.mosdns.fake.root.",
-		Serial:  2021110400,
-		Refresh: 1800,
-		Retry:   900,
-		Expire:  604800,
-		Minttl:  86400,
+		SOA: rdata.SOA{
+			Ns:      "fake-ns.mosdns.fake.root.",
+			Mbox:    "fake-mbox.mosdns.fake.root.",
+			Serial:  2021110400,
+			Refresh: 1800,
+			Retry:   900,
+			Expire:  604800,
+			Minttl:  86400,
+		},
 	}
 }
 
 // GetMsgKey unpacks m and set its id to salt.
 func GetMsgKey(m *dns.Msg, salt uint16) (string, error) {
-	wireMsg, err := m.Pack()
+	err := m.Pack()
 	if err != nil {
 		return "", err
 	}
+	wireMsg := m.Data
 	wireMsg[0] = byte(salt >> 8)
 	wireMsg[1] = byte(salt)
-	return utils.BytesToStringUnsafe(wireMsg), nil
+	return string(wireMsg), nil
 }
 
-// GetMsgKeyWithBytesSalt unpacks m and appends salt to the string.
-func GetMsgKeyWithBytesSalt(m *dns.Msg, salt []byte) (string, error) {
-	wireMsg, buf, err := pool.PackBuffer(m)
-	if err != nil {
-		return "", err
-	}
-	defer buf.Release()
-
-	wireMsg[0] = 0
-	wireMsg[1] = 0
-
-	sb := new(strings.Builder)
-	sb.Grow(len(wireMsg) + len(salt))
-	sb.Write(wireMsg)
-	sb.Write(salt)
-
-	return sb.String(), nil
-}
-
-// GetMsgKeyWithInt64Salt unpacks m and appends salt to the string.
-func GetMsgKeyWithInt64Salt(m *dns.Msg, salt int64) (string, error) {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, uint64(salt))
-	return GetMsgKeyWithBytesSalt(m, b)
-}
+// // GetMsgKeyWithBytesSalt unpacks m and appends salt to the string.
+// func GetMsgKeyWithBytesSalt(m *dns.Msg, salt []byte) (string, error) {
+// 	wireMsg, buf, err := pool.PackBuffer(m)
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	defer buf.Release()
+//
+// 	wireMsg[0] = 0
+// 	wireMsg[1] = 0
+//
+// 	sb := new(strings.Builder)
+// 	sb.Grow(len(wireMsg) + len(salt))
+// 	sb.Write(wireMsg)
+// 	sb.Write(salt)
+//
+// 	return sb.String(), nil
+// }
+//
+// // GetMsgKeyWithInt64Salt unpacks m and appends salt to the string.
+// func GetMsgKeyWithInt64Salt(m *dns.Msg, salt int64) (string, error) {
+// 	b := make([]byte, 8)
+// 	binary.BigEndian.PutUint64(b, uint64(salt))
+// 	return GetMsgKeyWithBytesSalt(m, b)
+// }

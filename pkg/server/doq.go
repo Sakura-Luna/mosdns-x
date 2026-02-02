@@ -28,7 +28,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
-	"github.com/pmkol/mosdns-x/pkg/pool"
 	C "github.com/pmkol/mosdns-x/pkg/query_context"
 	"github.com/pmkol/mosdns-x/pkg/utils"
 )
@@ -123,7 +122,7 @@ func (s *Server) ServeQUIC(l *quic.EarlyListener) error {
 					defer stream.Close()
 					stream.CancelRead(0)
 
-					if req.Id != 0 {
+					if req.ID != 0 {
 						stream.CancelWrite(1)
 						closer.close(1)
 						return
@@ -137,15 +136,14 @@ func (s *Server) ServeQUIC(l *quic.EarlyListener) error {
 						return
 					}
 
-					b, buf, err := pool.PackBuffer(r)
+					err = r.Pack()
 					if err != nil {
 						stream.CancelWrite(1)
 						s.opts.Logger.Error("failed to unpack handler's response", zap.Error(err), zap.Stringer("msg", r))
 						return
 					}
-					defer buf.Release()
 
-					if _, err := dnsutils.WriteRawMsgToTCP(stream, b); err != nil {
+					if _, err := dnsutils.WriteRawMsgToTCP(stream, r.Data); err != nil {
 						stream.CancelWrite(1)
 						s.opts.Logger.Warn("failed to write response", zap.Stringer("client", c.RemoteAddr()), zap.Error(err))
 					}

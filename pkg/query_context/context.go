@@ -27,10 +27,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 	"go.uber.org/zap"
-
-	"github.com/pmkol/mosdns-x/pkg/dnsutils"
 )
 
 const (
@@ -144,7 +142,8 @@ func (ctx *Context) String() string {
 
 	if len(ctx.q.Question) >= 1 {
 		q := ctx.q.Question[0]
-		question = fmt.Sprintf("%s %s %s", q.Name, dnsutils.QclassToString(q.Qclass), dnsutils.QtypeToString(q.Qtype))
+		hdr := q.Header()
+		question = fmt.Sprintf("%s %s %s", hdr.Name, dns.ClassToString[hdr.Class], dns.TypeToString[dns.RRToType(q)])
 	} else {
 		question = "empty question"
 	}
@@ -154,7 +153,7 @@ func (ctx *Context) String() string {
 		clientAddr = "unknown client"
 	}
 
-	return fmt.Sprintf("%s %d %d %s", question, ctx.q.Id, ctx.id, clientAddr)
+	return fmt.Sprintf("%s %d %d %s", question, ctx.q.ID, ctx.id, clientAddr)
 }
 
 // Q returns the query msg. It always returns a non-nil msg.

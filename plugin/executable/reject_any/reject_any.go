@@ -22,7 +22,9 @@ package rejectany
 import (
 	"context"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
+	"codeberg.org/miekg/dns/rdata"
 
 	"github.com/pmkol/mosdns-x/coremain"
 	"github.com/pmkol/mosdns-x/pkg/executable_seq"
@@ -45,21 +47,22 @@ type rejectAny struct {
 
 func (p *rejectAny) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
 	q := qCtx.Q()
-	if q.Question[0].Qtype != dns.TypeANY {
+	if dns.RRToType(q.Question[0]) != dns.TypeANY {
 		return executable_seq.ExecChainNode(ctx, qCtx, next)
 	}
 	r := new(dns.Msg)
-	r.SetReply(q)
+	dnsutil.SetReply(r, q)
 	r.Answer = []dns.RR{
 		&dns.HINFO{
-			Hdr: dns.RR_Header{
-				Name:   q.Question[0].Name,
-				Rrtype: dns.TypeHINFO,
-				Ttl:    8482,
-				Class:  dns.ClassINET,
+			Hdr: dns.Header{
+				Name:  q.Question[0].Header().Name,
+				TTL:   8482,
+				Class: dns.ClassINET,
 			},
-			Cpu: "ANY obsoleted",
-			Os:  "See RFC 8482",
+			HINFO: rdata.HINFO{
+				Cpu: "ANY obsoleted",
+				Os:  "See RFC 8482",
+			},
 		},
 	}
 	qCtx.SetResponse(r)

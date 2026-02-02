@@ -26,7 +26,9 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
+	"codeberg.org/miekg/dns/rdata"
 
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
 	"github.com/pmkol/mosdns-x/pkg/matcher/domain"
@@ -56,9 +58,9 @@ func (h *Hosts) LookupMsg(m *dns.Msg) *dns.Msg {
 		return nil
 	}
 	q := m.Question[0]
-	typ := q.Qtype
-	fqdn := q.Name
-	if q.Qclass != dns.ClassINET || (typ != dns.TypeA && typ != dns.TypeAAAA) {
+	typ := dns.RRToType(q)
+	fqdn := q.Header().Name
+	if q.Header().Class != dns.ClassINET || (typ != dns.TypeA && typ != dns.TypeAAAA) {
 		return nil
 	}
 
@@ -68,7 +70,7 @@ func (h *Hosts) LookupMsg(m *dns.Msg) *dns.Msg {
 	}
 
 	r := new(dns.Msg)
-	r.SetReply(m)
+	dnsutil.SetReply(r, m)
 	r.RecursionAvailable = true
 	switch {
 	case typ == dns.TypeA && len(ipv4) > 0:
@@ -77,13 +79,12 @@ func (h *Hosts) LookupMsg(m *dns.Msg) *dns.Msg {
 		})
 		for _, ip := range ipv4 {
 			rr := &dns.A{
-				Hdr: dns.RR_Header{
-					Name:   fqdn,
-					Rrtype: dns.TypeA,
-					Class:  dns.ClassINET,
-					Ttl:    10,
+				Hdr: dns.Header{
+					Name:  fqdn,
+					Class: dns.ClassINET,
+					TTL:   10,
 				},
-				A: ip.AsSlice(),
+				A: rdata.A{Addr: ip},
 			}
 			r.Answer = append(r.Answer, rr)
 		}
@@ -93,13 +94,12 @@ func (h *Hosts) LookupMsg(m *dns.Msg) *dns.Msg {
 		})
 		for _, ip := range ipv6 {
 			rr := &dns.AAAA{
-				Hdr: dns.RR_Header{
-					Name:   fqdn,
-					Rrtype: dns.TypeAAAA,
-					Class:  dns.ClassINET,
-					Ttl:    10,
+				Hdr: dns.Header{
+					Name:  fqdn,
+					Class: dns.ClassINET,
+					TTL:   10,
 				},
-				AAAA: ip.AsSlice(),
+				AAAA: rdata.AAAA{Addr: ip},
 			}
 			r.Answer = append(r.Answer, rr)
 		}

@@ -26,7 +26,7 @@ import (
 
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 )
 
 type udpmeUpstream struct {
@@ -54,45 +54,50 @@ func (u *udpmeUpstream) Trusted() bool {
 }
 
 func (u *udpmeUpstream) Exchange(ctx context.Context, m *dns.Msg) (*dns.Msg, error) {
-	ddl, ok := ctx.Deadline()
-	if !ok {
-		ddl = time.Now().Add(time.Second * 3)
+	timeout := time.Second * 3
+	if ddl, ok := ctx.Deadline(); ok {
+		timeout = ddl.Sub(time.Now())
 	}
 
-	if m.IsEdns0() != nil {
-		return u.exchangeOPTM(m, ddl)
+	EDNSFlag := m.IsEdns0()
+	if !EDNSFlag {
+		m = m.Copy()
+		m.UDPSize = 1232
 	}
-	mc := m.Copy()
-	mc.SetEdns0(512, false)
-	r, err := u.exchangeOPTM(mc, ddl)
-	if err != nil {
-		return nil, err
+	r, e := u.exchangeOPTM(m, timeout)
+	switch {
+	case ctx.Err() != nil:
+		return nil, ctx.Err()
+	case e != nil:
+		return nil, e
+	default:
+		if !EDNSFlag {
+			dnsutils.RemoveEDNS0(r)
+		}
+		return r, nil
 	}
-	dnsutils.RemoveEDNS0(r)
-	return r, nil
 }
 
-func (u *udpmeUpstream) exchangeOPTM(m *dns.Msg, ddl time.Time) (*dns.Msg, error) {
-	c, err := dns.Dial("udp", u.addr)
+func (u *udpmeUpstream) exchangeOPTM(m *dns.Msg, dur time.Duration) (*dns.Msg, error) {
+	c, err := net.DialTimeout("udp", u.addr, dur)
 	if err != nil {
 		return nil, err
 	}
 	defer c.Close()
-	c.SetDeadline(ddl)
-	if opt := m.IsEdns0(); opt != nil {
-		c.UDPSize = opt.UDPSize()
-	}
 
-	if err := c.WriteMsg(m); err != nil {
+	m.Pack()
+	conn := dnsutils.Conn{Conn: c}
+	if err = conn.WriteMsg(m); err != nil {
 		return nil, err
 	}
 
+	buf := make([]byte, 4096)
 	for {
-		r, err := c.ReadMsg()
+		r, err := conn.ReadMsg(buf)
 		if err != nil {
 			return nil, err
 		}
-		if r.IsEdns0() == nil {
+		if !dnsutils.IsEdnsResp(r) {
 			continue
 		}
 		return r, nil

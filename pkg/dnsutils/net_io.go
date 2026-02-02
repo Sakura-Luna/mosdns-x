@@ -24,13 +24,40 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 
 	"github.com/pmkol/mosdns-x/pkg/pool"
 )
 
 var errZeroLenMsg = errors.New("zero length msg")
+
+type Conn struct {
+	net.Conn
+}
+
+func (c *Conn) ReadMsg(b ...[]byte) (*dns.Msg, error) {
+	var buf []byte
+	if len(b) > 0 {
+		buf = b[0]
+	} else {
+		buf = make([]byte, 4096)
+	}
+	n, err := c.Conn.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+	r := new(dns.Msg)
+	r.Data = buf[:n]
+	err = r.Unpack()
+	return r, err
+}
+
+func (c *Conn) WriteMsg(m *dns.Msg) error {
+	_, err := c.Conn.Write(m.Data)
+	return err
+}
 
 // ReadRawMsgFromTCP reads msg from c in RFC 1035 format (msg is prefixed
 // with a two byte length field).
@@ -81,12 +108,11 @@ func ReadMsgFromTCP(c io.Reader) (*dns.Msg, int, error) {
 // WriteMsgToTCP packs and writes m to c in RFC 1035 format.
 // n represents how many bytes are written to c.
 func WriteMsgToTCP(c io.Writer, m *dns.Msg) (n int, err error) {
-	mRaw, buf, err := pool.PackBuffer(m)
+	err = m.Pack()
 	if err != nil {
 		return 0, err
 	}
-	defer buf.Release()
-	return WriteRawMsgToTCP(c, mRaw)
+	return WriteRawMsgToTCP(c, m.Data)
 }
 
 // WriteRawMsgToTCP See WriteMsgToTCP
@@ -105,35 +131,34 @@ func WriteRawMsgToTCP(c io.Writer, b []byte) (n int, err error) {
 }
 
 func WriteMsgToUDP(c io.Writer, m *dns.Msg) (int, error) {
-	b, buf, err := pool.PackBuffer(m)
+	err := m.Pack()
 	if err != nil {
 		return 0, err
 	}
-	defer buf.Release()
-
-	return c.Write(b)
+	return c.Write(m.Data)
 }
 
-func ReadMsgFromUDP(c io.Reader, bufSize int) (*dns.Msg, int, error) {
-	if bufSize < dns.MinMsgSize {
-		bufSize = dns.MinMsgSize
-	}
-
-	buf := pool.GetBuf(bufSize)
-	defer buf.Release()
-	b := buf.Bytes()
-	n, err := c.Read(b)
-	if err != nil {
-		return nil, n, err
-	}
-
-	m, err := unpackMsgWithDetailedErr(b[:n])
-	return m, n, err
-}
+// func ReadMsgFromUDP(c io.Reader, bufSize int) (*dns.Msg, int, error) {
+// 	if bufSize < dns.MinMsgSize {
+// 		bufSize = dns.MinMsgSize
+// 	}
+//
+// 	buf := pool.GetBuf(bufSize)
+// 	defer buf.Release()
+// 	b := buf.Bytes()
+// 	n, err := c.Read(b)
+// 	if err != nil {
+// 		return nil, n, err
+// 	}
+//
+// 	m, err := unpackMsgWithDetailedErr(b[:n])
+// 	return m, n, err
+// }
 
 func unpackMsgWithDetailedErr(b []byte) (*dns.Msg, error) {
 	m := new(dns.Msg)
-	if err := m.Unpack(b); err != nil {
+	m.Data = b
+	if err := m.Unpack(); err != nil {
 		return nil, fmt.Errorf("failed to unpack msg [%x], %w", b, err)
 	}
 	return m, nil

@@ -24,7 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"github.com/pmkol/mosdns-x/coremain"
 	"github.com/pmkol/mosdns-x/pkg/concurrent_limiter"
@@ -78,7 +79,8 @@ func (l *Limiter) Exec(ctx context.Context, qCtx *query_context.Context, next ex
 	}
 	if ok := l.hpLimiter.AcquireToken(addr); !ok {
 		r := new(dns.Msg)
-		r.SetRcode(qCtx.Q(), dns.RcodeRefused)
+		dnsutil.SetReply(r, qCtx.Q())
+		r.Rcode = dns.RcodeRefused
 		qCtx.SetResponse(r)
 		return nil
 	}

@@ -30,9 +30,8 @@ import (
 	"gitlab.com/go-extension/tls"
 	"go.uber.org/zap"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
-	"github.com/pmkol/mosdns-x/pkg/pool"
 	C "github.com/pmkol/mosdns-x/pkg/query_context"
 	"github.com/pmkol/mosdns-x/pkg/server/dns_handler"
 	"github.com/pmkol/mosdns-x/pkg/utils"
@@ -155,14 +154,13 @@ func (s *Server) handleQueryTcp(ctx context.Context, c *TCPConn, req *dns.Msg) {
 		return
 	}
 
-	b, buf, err := pool.PackBuffer(r)
+	err = r.Pack()
 	if err != nil {
 		s.opts.Logger.Error("failed to unpack handler's response", zap.Error(err), zap.Stringer("msg", r))
 		return
 	}
-	defer buf.Release()
 
-	_, err = c.WriteRawMsg(b)
+	_, err = c.WriteRawMsg(r.Data)
 	if err != nil {
 		s.opts.Logger.Warn("failed to write response", zap.Stringer("client", c.RemoteAddr()), zap.Error(err))
 		return

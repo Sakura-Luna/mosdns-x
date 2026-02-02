@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 	"go.uber.org/zap"
 
 	"github.com/pmkol/mosdns-x/coremain"
@@ -108,69 +108,70 @@ func newFastForward(bp *coremain.BP, args *Args) (*fastForward, error) {
 			return nil, errors.New("missing server addr")
 		}
 
+		trusted := c.Trusted || i == 0 // Set first upstream as trusted upstream.
 		if strings.HasPrefix(c.Addr, "udpme://") {
-			u := newUDPME(c.Addr[8:], c.Trusted)
+			u := newUDPME(c.Addr[8:], trusted)
 			f.upstreamWrappers = append(f.upstreamWrappers, u)
-			if i == 0 {
-				u.trusted = true
-			}
-			continue
-		}
-
-		dialAdders := c.DialAdders
-		if len(dialAdders) == 0 {
-			dialAdders = []string{""}
-		}
-		upstreams := make([]upstream.Upstream, 0, len(dialAdders))
-		for _, addr := range dialAdders {
-			opt := &upstream.Opt{
-				DialAddr:       addr,
-				Socks5:         c.Socks5,
-				S5Username:     c.S5Username,
-				S5Password:     c.S5Password,
-				SoMark:         c.SoMark,
-				BindToDevice:   c.BindToDevice,
-				IdleTimeout:    time.Duration(c.IdleTimeout) * time.Second,
-				MaxConns:       c.MaxConns,
-				EnablePipeline: c.EnablePipeline,
-				Bootstrap:      c.Bootstrap,
-				Insecure:       c.Insecure,
-				RootCAs:        rootCAs,
-				KernelTX:       c.KernelTX,
-				KernelRX:       c.KernelRX,
-				Logger:         bp.L(),
-			}
-
-			u, err := upstream.NewUpstream(c.Addr, opt)
+		} else {
+			u, addr, err := newUpstream(bp, c, rootCAs)
 			if err != nil {
-				return nil, fmt.Errorf("failed to init upstream: %w", err)
+				bp.L().Warn("Upstream init failed", zap.String("addr", c.Addr), zap.Error(err))
+				continue
 			}
-			upstreams = append(upstreams, u)
-		}
-		k, err := SelectFastestUpstream(upstreams)
-		if err != nil {
-			k = 0
-			err = fmt.Errorf("failed to set upstream, because: %w", err)
-			bp.L().Error("upstream", zap.String("addr", c.Addr), zap.Error(err))
-		}
-		u := upstreams[k]
 
-		w := &upstreamWrapper{
-			address: c.Addr,
-			ipAddr:  dialAdders[k],
-			trusted: c.Trusted,
-			u:       u,
-		}
+			w := &upstreamWrapper{
+				address: c.Addr,
+				ipAddr:  addr,
+				trusted: trusted,
+				u:       u,
+			}
 
-		if i == 0 { // Set first upstream as trusted upstream.
-			w.trusted = true
+			f.upstreamWrappers = append(f.upstreamWrappers, w)
+			f.upstreamsCloser = append(f.upstreamsCloser, u)
 		}
-
-		f.upstreamWrappers = append(f.upstreamWrappers, w)
-		f.upstreamsCloser = append(f.upstreamsCloser, u)
 	}
-
 	return f, nil
+}
+
+func newUpstream(bp *coremain.BP, c *UpstreamConfig, ca *x509.CertPool) (upstream.Upstream, string, error) {
+	dialAdders := c.DialAdders
+	if len(dialAdders) == 0 {
+		dialAdders = append(dialAdders, "")
+	}
+	upstreams := make([]upstream.Upstream, 0, len(dialAdders))
+
+	for _, addr := range dialAdders {
+		opt := &upstream.Opt{
+			DialAddr:       addr,
+			Socks5:         c.Socks5,
+			S5Username:     c.S5Username,
+			S5Password:     c.S5Password,
+			SoMark:         c.SoMark,
+			BindToDevice:   c.BindToDevice,
+			IdleTimeout:    time.Duration(c.IdleTimeout) * time.Second,
+			MaxConns:       c.MaxConns,
+			EnablePipeline: c.EnablePipeline,
+			Bootstrap:      c.Bootstrap,
+			Insecure:       c.Insecure,
+			RootCAs:        ca,
+			KernelTX:       c.KernelTX,
+			KernelRX:       c.KernelRX,
+			Logger:         bp.L(),
+		}
+
+		u, err := upstream.NewUpstream(c.Addr, opt)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to init upstream: %w", err)
+		}
+		upstreams = append(upstreams, u)
+	}
+	k, err := SelectFastestUpstream(upstreams)
+	if err != nil {
+		k = 0
+		err = fmt.Errorf("failed to set upstream, because: %w", err)
+		bp.L().Error("upstream", zap.String("addr", c.Addr), zap.Error(err))
+	}
+	return upstreams[k], dialAdders[k], nil
 }
 
 func SelectFastestUpstream(upstreams []upstream.Upstream) (int, error) {
@@ -184,16 +185,13 @@ func SelectFastestUpstream(upstreams []upstream.Upstream) (int, error) {
 	defer cancel()
 
 	for i, u := range upstreams {
-		i, u := i, u
-
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
-			q := new(dns.Msg)
-			q.SetQuestion("example.com.", dns.TypeA)
+			q := dns.NewMsg("example.com.", dns.TypeA)
 			r, err := u.ExchangeContext(ctx, q)
-			if err != nil || r == nil || r.Id != q.Id {
+			if err != nil || r == nil || r.ID != q.ID {
 				return
 			}
 
@@ -224,7 +222,6 @@ type upstreamWrapper struct {
 }
 
 func (u *upstreamWrapper) Exchange(ctx context.Context, q *dns.Msg) (*dns.Msg, error) {
-	q.Compress = true
 	return u.u.ExchangeContext(ctx, q)
 }
 

@@ -19,44 +19,45 @@
 
 package dnsutils
 
-import "github.com/miekg/dns"
+import "codeberg.org/miekg/dns"
+
+func IsEdnsResp(r *dns.Msg) bool {
+	return r.UDPSize > 0 || r.IsEdns0()
+}
 
 // UpgradeEDNS0 enables EDNS0 for m and returns it's dns.OPT record.
 // m must be a msg without dns.OPT.
-func UpgradeEDNS0(m *dns.Msg) *dns.OPT {
-	o := new(dns.OPT)
-	o.SetUDPSize(dns.MinMsgSize)
-	o.Hdr.Name = "."
-	o.Hdr.Rrtype = dns.TypeOPT
-	m.Extra = append(m.Extra, o)
-	return o
+func UpgradeEDNS0(m *dns.Msg) {
+	m.UDPSize = 1232
+	return
 }
 
 // RemoveEDNS0 removes the OPT record from m.
 func RemoveEDNS0(m *dns.Msg) {
-	for i := len(m.Extra) - 1; i >= 0; i-- {
-		if m.Extra[i].Header().Rrtype == dns.TypeOPT {
-			m.Extra = append(m.Extra[:i], m.Extra[i+1:]...)
+	m.UDPSize = 0
+	m.Security = false
+	m.CompactAnswers = false
+	m.Delegation = false
+	m.Pseudo = []dns.RR{}
+	return
+}
+
+func RemoveEDNS0Option(m *dns.Msg, opt uint16) {
+	ps := m.Pseudo
+	for i, o := range ps {
+		if dns.RRToCode(o.(dns.EDNS0)) == opt {
+			m.Pseudo = append(ps[:i], ps[i+1:]...)
 			return
 		}
 	}
 	return
 }
 
-func RemoveEDNS0Option(opt *dns.OPT, option uint16) {
-	for i := range opt.Option {
-		if opt.Option[i].Option() == option {
-			opt.Option = append(opt.Option[:i], opt.Option[i+1:]...)
-			return
-		}
-	}
-	return
-}
-
-func GetEDNS0Option(opt *dns.OPT, option uint16) dns.EDNS0 {
-	for o := range opt.Option {
-		if opt.Option[o].Option() == option {
-			return opt.Option[o]
+func GetEDNS0Option(m *dns.Msg, opt uint16) dns.EDNS0 {
+	for _, o := range m.Pseudo {
+		option := o.(dns.EDNS0)
+		if dns.RRToCode(option) == opt {
+			return option
 		}
 	}
 	return nil

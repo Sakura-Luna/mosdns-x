@@ -21,10 +21,10 @@ package hosts
 
 import (
 	"bytes"
-	"net"
+	"net/netip"
 	"testing"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 
 	"github.com/pmkol/mosdns-x/pkg/matcher/domain"
 )
@@ -68,8 +68,7 @@ func Test_hostsContainer_Match(t *testing.T) {
 		{"test matched domain with mismatched type", args{name: "test.com.", typ: dns.TypeAAAA}, true, nil},
 	}
 	for _, tt := range tests {
-		q := new(dns.Msg)
-		q.SetQuestion(tt.args.name, tt.args.typ)
+		q := dns.NewMsg(tt.args.name, tt.args.typ)
 
 		t.Run(tt.name, func(t *testing.T) {
 			r := h.LookupMsg(q)
@@ -78,22 +77,22 @@ func Test_hostsContainer_Match(t *testing.T) {
 			}
 
 			for _, s := range tt.wantAddr {
-				wantIP := net.ParseIP(s)
-				if wantIP == nil {
+				wantIP, err := netip.ParseAddr(s)
+				if err != nil {
 					t.Fatal("invalid test case addr")
 				}
 				found := false
 				for _, rr := range r.Answer {
-					var ip net.IP
+					var ip netip.Addr
 					switch rr := rr.(type) {
 					case *dns.A:
-						ip = rr.A
+						ip = rr.A.Addr
 					case *dns.AAAA:
-						ip = rr.AAAA
+						ip = rr.AAAA.Addr
 					default:
 						continue
 					}
-					if ip.Equal(wantIP) {
+					if ip == wantIP {
 						found = true
 						break
 					}

@@ -27,7 +27,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
+	"github.com/pmkol/mosdns-x/pkg/dnsutils"
 	"github.com/spf13/cobra"
 
 	"github.com/pmkol/mosdns-x/mlog"
@@ -97,9 +98,10 @@ func getConn(addr string) (net.Conn, error) {
 	case "tls":
 		host = tryAddPort(host, 853)
 		serverName, _, _ := net.SplitHostPort(host)
-		tlsConfig := new(tls.Config)
-		tlsConfig.InsecureSkipVerify = false
-		tlsConfig.ServerName = serverName
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: false,
+			ServerName:         serverName,
+		}
 		conn, err := net.Dial("tcp", host)
 		if err != nil {
 			return nil, err
@@ -125,13 +127,12 @@ func ProbServerConnectionReuse(addr string) error {
 	}
 	defer c.Close()
 
-	conn := dns.Conn{Conn: c}
+	conn := dnsutils.Conn{Conn: c}
 	for i := 0; i < 3; i++ {
 		conn.SetDeadline(time.Now().Add(time.Second * 3))
 
-		q := new(dns.Msg)
-		q.SetQuestion("www.cloudflare.com.", dns.TypeA)
-		q.Id = uint16(i)
+		q := dns.NewMsg("www.cloudflare.com.", dns.TypeA)
+		q.ID = uint16(i)
 
 		mlog.S().Infof("sending msg #%d", i)
 		err = conn.WriteMsg(q)
@@ -142,7 +143,7 @@ func ProbServerConnectionReuse(addr string) error {
 		if err != nil {
 			return fmt.Errorf("failed to read #%d probe msg response: %v", i, err)
 		}
-		mlog.S().Infof("recevied response #%d", i)
+		mlog.S().Infof("received response #%d", i)
 	}
 
 	mlog.S().Infof("server %s supports RFC 1035 connection reuse", addr)
@@ -156,11 +157,7 @@ func ProbServerPipeline(addr string) error {
 	}
 	defer c.Close()
 
-	conn := dns.Conn{Conn: c}
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
+	conn := dnsutils.Conn{Conn: c}
 	domains := make([]string, 0)
 	for i := 0; i < 4; i++ {
 		b := make([]byte, 8)
@@ -174,9 +171,8 @@ func ProbServerPipeline(addr string) error {
 	for i, d := range domains {
 		conn.SetDeadline(time.Now().Add(time.Second * 10))
 
-		q := new(dns.Msg)
-		q.SetQuestion(d, dns.TypeA)
-		q.Id = uint16(i)
+		q := dns.NewMsg(d, dns.TypeA)
+		q.ID = uint16(i)
 
 		err = conn.WriteMsg(q)
 		if err != nil {
@@ -193,8 +189,8 @@ func ProbServerPipeline(addr string) error {
 			return fmt.Errorf("failed to read #%d probe msg response: %v", i, err)
 		}
 
-		mlog.S().Infof("#%d response received, latency: %d ms", m.Id, time.Since(start).Milliseconds())
-		if m.Id != uint16(i) {
+		mlog.S().Infof("#%d response received, latency: %d ms", m.ID, time.Since(start).Milliseconds())
+		if m.ID != uint16(i) {
 			oooPassed = true
 		}
 	}
@@ -214,9 +210,8 @@ func ProbServerTimeout(addr string) error {
 	}
 	defer c.Close()
 
-	conn := dns.Conn{Conn: c}
-	q := new(dns.Msg)
-	q.SetQuestion("www.cloudflare.com.", dns.TypeA)
+	conn := dnsutils.Conn{Conn: c}
+	q := dns.NewMsg("www.cloudflare.com.", dns.TypeA)
 	err = conn.WriteMsg(q)
 	if err != nil {
 		return fmt.Errorf("failed to write probe msg: %v", err)

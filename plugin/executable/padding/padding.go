@@ -22,7 +22,7 @@ package padding
 import (
 	"context"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 
 	"github.com/pmkol/mosdns-x/coremain"
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
@@ -50,8 +50,9 @@ var (
 )
 
 const (
-	minimumQueryLen    = 128
-	minimumResponseLen = 468
+	queryLen    = 128
+	responseLen = 468
+	maxPadLen   = 1232
 )
 
 type PadQuery struct {
@@ -61,22 +62,23 @@ type PadQuery struct {
 // Exec pads queries to 128 octets as RFC 8467 recommended.
 func (p *PadQuery) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
 	q := qCtx.Q()
-	dnsutils.PadToMinimum(q, minimumQueryLen)
+	if q.Len() <= 1152 {
+		dnsutils.RemoveEDNS0Option(q, dns.CodePADDING)
+		q.Pad(queryLen)
+	} else {
+		dnsutils.PadToMinimum(q, maxPadLen)
+	}
 
 	if err := executable_seq.ExecChainNode(ctx, qCtx, next); err != nil {
 		return err
 	}
 	if r := qCtx.R(); r != nil {
 		oq := qCtx.OriginalQuery()
-		opt := oq.IsEdns0()
-		if opt == nil { // The original query does not have EDNS0
+		if !oq.IsEdns0() { // The original query does not have EDNS0
 			dnsutils.RemoveEDNS0(r) // Remove EDNS0 from the response.
 		} else {
-			if dnsutils.GetEDNS0Option(opt, dns.EDNS0PADDING) == nil { // The original query does not have Padding option.
-				if opt := r.IsEdns0(); opt != nil { // Remove Padding from the response.
-					dnsutils.RemoveEDNS0Option(opt, dns.EDNS0PADDING)
-				}
-			}
+			// If original query does not have Padding option.
+			dnsutils.RemoveEDNS0Option(r, dns.CodePADDING)
 		}
 	}
 	return nil
@@ -97,14 +99,14 @@ func (h *ResponsePaddingHandler) Exec(ctx context.Context, qCtx *query_context.C
 
 	oq := qCtx.OriginalQuery()
 	if r := qCtx.R(); r != nil {
-		opt := oq.IsEdns0()
-		if opt != nil { // Only pad response if client supports EDNS0.
-			if h.Always {
-				dnsutils.PadToMinimum(r, minimumResponseLen)
-			} else {
-				// Only pad response if client padded its query.
-				if dnsutils.GetEDNS0Option(opt, dns.EDNS0PADDING) != nil {
-					dnsutils.PadToMinimum(r, minimumResponseLen)
+		if oq.IsEdns0() { // Only pad response if client supports EDNS0.
+			// Only pad response if client padded its query unless force.
+			if h.Always || dnsutils.GetEDNS0Option(oq, dns.CodePADDING) != nil {
+				if r.Len() <= 936 {
+					dnsutils.RemoveEDNS0Option(r, dns.CodePADDING)
+					r.Pad(responseLen)
+				} else {
+					dnsutils.PadToMinimum(r, maxPadLen)
 				}
 			}
 		}

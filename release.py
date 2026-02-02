@@ -57,7 +57,7 @@ def go_build():
     if args.i:
         envs = [envs[args.i]]
 
-    VERSION = f'4.6.1'
+    VERSION = f'4.7.0'
     BuildTime = f'{datetime.datetime.now().strftime("%y.%m.%d")}'
     print(f"Using version: {VERSION}")
 

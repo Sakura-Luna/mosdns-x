@@ -20,12 +20,12 @@
 package elem
 
 type IntMatcher struct {
-	m map[int]struct{}
+	m map[uint16]struct{}
 }
 
 // NewIntMatcher inits a new IntMatcher.
-func NewIntMatcher(elem []int) *IntMatcher {
-	matcher := &IntMatcher{m: make(map[int]struct{})}
+func NewIntMatcher(elem []uint16) *IntMatcher {
+	matcher := &IntMatcher{m: make(map[uint16]struct{})}
 
 	for _, v := range elem {
 		matcher.m[v] = struct{}{}
@@ -33,7 +33,7 @@ func NewIntMatcher(elem []int) *IntMatcher {
 	return matcher
 }
 
-func (m *IntMatcher) Match(v int) bool {
+func (m *IntMatcher) Match(v uint16) bool {
 	_, ok := m.m[v]
 	return ok
 }

@@ -23,7 +23,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 	"go.uber.org/zap"
 
 	"github.com/pmkol/mosdns-x/coremain"
@@ -39,8 +39,8 @@ const (
 	modePreferIPv4 = iota
 	modePreferIPv6
 
-	defaultWaitTimeout      = time.Millisecond * 250
-	defaultSubRoutineTimout = time.Second * 5
+	defaultWaitTimeout       = time.Millisecond * 250
+	defaultSubRoutineTimeout = time.Second * 5
 )
 
 func init() {
@@ -80,7 +80,7 @@ func (s *Selector) Exec(ctx context.Context, qCtx *query_context.Context, next e
 		return executable_seq.ExecChainNode(ctx, qCtx, next)
 	}
 
-	qtype := q.Question[0].Qtype
+	qtype := dns.RRToType(q.Question[0])
 	// skip queries that have preferred type or have other unrelated qtypes.
 	if (qtype == dns.TypeA && s.mode == modePreferIPv4) || (qtype == dns.TypeAAAA && s.mode == modePreferIPv6) || (qtype != dns.TypeA && qtype != dns.TypeAAAA) {
 		return executable_seq.ExecChainNode(ctx, qCtx, next)
@@ -88,17 +88,19 @@ func (s *Selector) Exec(ctx context.Context, qCtx *query_context.Context, next e
 
 	// start reference goroutine
 	qCtxRef := qCtx.Copy()
+	hdr := qCtxRef.Q().Question[0].Header()
 	var refQtype uint16
 	if qtype == dns.TypeA {
 		refQtype = dns.TypeAAAA
+		qCtxRef.Q().Question[0] = &dns.AAAA{Hdr: *hdr}
 	} else {
 		refQtype = dns.TypeA
+		qCtxRef.Q().Question[0] = &dns.A{Hdr: *hdr}
 	}
-	qCtxRef.Q().Question[0].Qtype = refQtype
 
 	ddl, ok := ctx.Deadline()
 	if !ok {
-		ddl = time.Now().Add(defaultSubRoutineTimout)
+		ddl = time.Now().Add(defaultSubRoutineTimeout)
 	}
 
 	shouldBlock := make(chan struct{}, 0)
@@ -177,7 +179,7 @@ func msgAnsHasRR(m *dns.Msg, t uint16) bool {
 	}
 
 	for _, rr := range m.Answer {
-		if rr.Header().Rrtype == t {
+		if dns.RRToType(rr) == t {
 			return true
 		}
 	}

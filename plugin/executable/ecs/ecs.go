@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"net/netip"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 
 	"github.com/pmkol/mosdns-x/coremain"
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
@@ -52,6 +52,7 @@ type Args struct {
 
 	// force overwrite existing ecs
 	ForceOverwrite bool `yaml:"force_overwrite"`
+	Hidden         bool `yaml:"hidden"`
 
 	// mask for ecs
 	Mask4 int `yaml:"mask4"` // default 24
@@ -130,28 +131,27 @@ func (e *ecsPlugin) Exec(ctx context.Context, qCtx *query_context.Context, next 
 		if upgraded {
 			dnsutils.RemoveEDNS0(r)
 		} else {
-			if newECS {
-				dnsutils.RemoveMsgECS(r)
+			if newECS && e.args.Hidden {
+				dnsutils.RemoveECS(r)
 			}
 		}
 	}
 	return nil
 }
 
-// addECS adds a *dns.EDNS0_SUBNET record to q.
+// addECS adds a *dns.SUBNET record to q.
 // upgraded: Whether the addECS upgraded the q to a EDNS0 enabled query.
-// newECS: Whether the addECS added a *dns.EDNS0_SUBNET to q that didn't
-// have a *dns.EDNS0_SUBNET before.
+// newECS: Whether the addECS added a *dns.SUBNET to q that didn't
+// have a *dns.SUBNET before.
 func (e *ecsPlugin) addECS(qCtx *query_context.Context) (upgraded bool, newECS bool) {
 	q := qCtx.Q()
-	opt := q.IsEdns0()
-	hasECS := opt != nil && dnsutils.GetECS(opt) != nil
+	hasECS := q.IsEdns0() && dnsutils.GetECS(q) != nil
 	if hasECS && !e.args.ForceOverwrite {
 		// Argument args.ForceOverwrite is disabled. q already has an edns0 subnet. Skip it.
 		return false, false
 	}
 
-	var ecs *dns.EDNS0_SUBNET
+	var ecs *dns.SUBNET
 	if e.args.Auto { // use client ip
 		clientAddr := qCtx.ReqMeta().GetClientAddr()
 		if !clientAddr.IsValid() {
@@ -160,43 +160,42 @@ func (e *ecsPlugin) addECS(qCtx *query_context.Context) (upgraded bool, newECS b
 
 		switch {
 		case clientAddr.Is4():
-			ecs = dnsutils.NewEDNS0Subnet(clientAddr.AsSlice(), uint8(e.args.Mask4), false)
+			ecs = dnsutils.NewEDNS0Subnet(clientAddr, uint8(e.args.Mask4), false)
 		case clientAddr.Is4In6():
-			ecs = dnsutils.NewEDNS0Subnet(clientAddr.Unmap().AsSlice(), uint8(e.args.Mask4), false)
+			ecs = dnsutils.NewEDNS0Subnet(clientAddr.Unmap(), uint8(e.args.Mask4), false)
 		case clientAddr.Is6():
-			ecs = dnsutils.NewEDNS0Subnet(clientAddr.AsSlice(), uint8(e.args.Mask6), true)
+			ecs = dnsutils.NewEDNS0Subnet(clientAddr, uint8(e.args.Mask6), true)
 		}
 	} else { // use preset ip
 		switch {
 		case checkQueryType(q, dns.TypeA):
 			if e.ipv4.IsValid() {
-				ecs = dnsutils.NewEDNS0Subnet(e.ipv4.AsSlice(), uint8(e.args.Mask4), false)
+				ecs = dnsutils.NewEDNS0Subnet(e.ipv4, uint8(e.args.Mask4), false)
 			} else if e.ipv6.IsValid() {
-				ecs = dnsutils.NewEDNS0Subnet(e.ipv6.AsSlice(), uint8(e.args.Mask6), true)
+				ecs = dnsutils.NewEDNS0Subnet(e.ipv6, uint8(e.args.Mask6), true)
 			}
 
 		case checkQueryType(q, dns.TypeAAAA):
 			if e.ipv6.IsValid() {
-				ecs = dnsutils.NewEDNS0Subnet(e.ipv6.AsSlice(), uint8(e.args.Mask6), true)
+				ecs = dnsutils.NewEDNS0Subnet(e.ipv6, uint8(e.args.Mask6), true)
 			} else if e.ipv4.IsValid() {
-				ecs = dnsutils.NewEDNS0Subnet(e.ipv4.AsSlice(), uint8(e.args.Mask4), false)
+				ecs = dnsutils.NewEDNS0Subnet(e.ipv4, uint8(e.args.Mask4), false)
 			}
 		}
 	}
 
 	if ecs != nil {
-		if opt == nil {
+		if !q.IsEdns0() {
 			upgraded = true
-			opt = dnsutils.UpgradeEDNS0(q)
 		}
-		newECS = dnsutils.AddECS(opt, ecs, true)
+		newECS = dnsutils.AddECS(q, ecs, true)
 		return upgraded, newECS
 	}
 	return false, false
 }
 
 func checkQueryType(m *dns.Msg, typ uint16) bool {
-	if len(m.Question) > 0 && m.Question[0].Qtype == typ {
+	if len(m.Question) > 0 && dns.RRToType(m.Question[0]) == typ {
 		return true
 	}
 	return false
@@ -209,12 +208,12 @@ type noECS struct {
 var _ coremain.ExecutablePlugin = (*noECS)(nil)
 
 func (n *noECS) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
-	dnsutils.RemoveMsgECS(qCtx.Q())
+	dnsutils.RemoveECS(qCtx.Q())
 	if err := executable_seq.ExecChainNode(ctx, qCtx, next); err != nil {
 		return err
 	}
 	if qCtx.R() != nil {
-		dnsutils.RemoveMsgECS(qCtx.R())
+		dnsutils.RemoveECS(qCtx.R())
 	}
 	return nil
 }

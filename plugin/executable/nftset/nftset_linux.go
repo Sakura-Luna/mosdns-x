@@ -26,8 +26,8 @@ import (
 	"fmt"
 	"net/netip"
 
+	"codeberg.org/miekg/dns"
 	"github.com/google/nftables"
-	"github.com/miekg/dns"
 	"go.uber.org/zap"
 
 	"github.com/pmkol/mosdns-x/coremain"
@@ -117,10 +117,9 @@ func (p *nftsetPlugin) addElems(r *dns.Msg) error {
 			if p.v4set == nil {
 				continue
 			}
-			addr, ok := netip.AddrFromSlice(rr.A)
-			addr = addr.Unmap()
-			if !ok || !addr.Is4() {
-				return fmt.Errorf("internel: dns.A record [%s] is not a ipv4 address", rr.A)
+			addr := rr.A.Addr
+			if !addr.Is4() {
+				return fmt.Errorf("internal: dns.A record [%s] is not a ipv4 address", rr.A)
 			}
 			v4Elems = append(v4Elems, netip.PrefixFrom(addr, p.args.Mask4))
 
@@ -128,9 +127,9 @@ func (p *nftsetPlugin) addElems(r *dns.Msg) error {
 			if p.v6set == nil {
 				continue
 			}
-			addr, ok := netip.AddrFromSlice(rr.AAAA)
-			if !ok {
-				return fmt.Errorf("internel: dns.AAAA record [%s] is not a ipv6 address", rr.AAAA)
+			addr := rr.AAAA.Addr
+			if !addr.Is6() {
+				return fmt.Errorf("internal: dns.AAAA record [%s] is not a ipv6 address", rr.AAAA)
 			}
 			if addr.Is4() {
 				addr = netip.AddrFrom16(addr.As16())

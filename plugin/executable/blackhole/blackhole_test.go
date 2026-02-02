@@ -21,10 +21,11 @@ package blackhole
 
 import (
 	"context"
-	"net"
+	"net/netip"
 	"testing"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"github.com/pmkol/mosdns-x/coremain"
 	"github.com/pmkol/mosdns-x/pkg/query_context"
@@ -36,7 +37,7 @@ func Test_blackhole_Exec(t *testing.T) {
 		args         *Args
 		queryType    uint16
 		wantResponse bool
-		wantRcode    int
+		wantRcode    uint16
 		wantIP       string
 	}{
 		{"drop response1", &Args{RCode: -1}, dns.TypeA, false, 0, ""},
@@ -54,10 +55,9 @@ func Test_blackhole_Exec(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			q := new(dns.Msg)
-			q.SetQuestion("example.com", tt.queryType)
+			q := dns.NewMsg("example.com", tt.queryType)
 			r := new(dns.Msg)
-			r.SetReply(q)
+			dnsutil.SetReply(r, q)
 			qCtx := query_context.NewContext(q, nil)
 			qCtx.SetResponse(r)
 
@@ -72,15 +72,15 @@ func Test_blackhole_Exec(t *testing.T) {
 
 			if tt.wantResponse {
 				if len(tt.wantIP) != 0 {
-					wantIP := net.ParseIP(tt.wantIP)
-					var gotIP net.IP
+					wantIP, _ := netip.ParseAddr(tt.wantIP)
+					var gotIP netip.Addr
 					switch tt.queryType {
 					case dns.TypeA:
-						gotIP = qCtx.R().Answer[0].(*dns.A).A
+						gotIP = qCtx.R().Answer[0].(*dns.A).A.Addr
 					case dns.TypeAAAA:
-						gotIP = qCtx.R().Answer[0].(*dns.AAAA).AAAA
+						gotIP = qCtx.R().Answer[0].(*dns.AAAA).AAAA.Addr
 					}
-					if !wantIP.Equal(gotIP) {
+					if gotIP != wantIP {
 						t.Fatalf("ip mismatched, want %v, got %v", wantIP, gotIP)
 					}
 				}

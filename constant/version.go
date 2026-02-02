@@ -19,9 +19,16 @@
 
 package constant
 
-import "time"
+import (
+	"fmt"
+	"net/http"
+	"strconv"
+	"time"
 
-var Version = "unknown"
+	e "gitlab.com/go-extension/http"
+)
+
+var Version = "undefined"
 
 var BuildTime = "00.00.00"
 
@@ -29,4 +36,58 @@ func init() {
 	if BuildTime == "00.00.00" {
 		BuildTime = time.Now().Format("06.01.02")
 	}
+}
+
+const DnsContentType = "application/dns-message"
+
+type HttpHeader interface {
+	Get(string) string
+	Set(key, value string)
+}
+
+func MakeHeader[T *http.Request | *e.Request](req T) {
+	var h HttpHeader
+
+	switch r := any(req).(type) {
+	case *http.Request:
+		h = r.Header
+	case *e.Request:
+		h = r.Header
+	}
+
+	if h != nil {
+		h.Set("Content-Type", DnsContentType)
+		h.Set("Accept", DnsContentType)
+		h.Set("User-Agent", "curl/8.0")
+	}
+}
+
+func DealResponse[T *http.Response | *e.Response](res T) error {
+	var h HttpHeader
+	var code int
+	var status string
+
+	switch r := any(res).(type) {
+	case *http.Response:
+		h = r.Header
+		code = r.StatusCode
+		status = r.Status
+	case *e.Response:
+		h = r.Header
+		code = r.StatusCode
+		status = r.Status
+	}
+
+	if code != 200 {
+		return fmt.Errorf("unexpected status %v: %s", code, status)
+	}
+	if contentType := h.Get("Content-Type"); contentType != DnsContentType {
+		return fmt.Errorf("unexpected content type: %s", contentType)
+	}
+	if contentLength := h.Get("Content-Length"); contentLength != "" {
+		if length, err := strconv.Atoi(contentLength); err == nil && length == 0 {
+			return fmt.Errorf("empty response")
+		}
+	}
+	return nil
 }

@@ -31,12 +31,11 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 	"github.com/quic-go/quic-go/http3"
 	"go.uber.org/zap"
 
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
-	"github.com/pmkol/mosdns-x/pkg/pool"
 	C "github.com/pmkol/mosdns-x/pkg/query_context"
 	"github.com/pmkol/mosdns-x/pkg/server/dns_handler"
 )
@@ -209,15 +208,16 @@ func (h *Handler) ServeHTTP(w ResponseWriter, req Request) {
 
 	// read msg
 	m := new(dns.Msg)
-	if err := m.Unpack(b); err != nil {
+	m.Data = b
+	if err := m.Unpack(); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("invalid request message"))
 		h.warnErr(req, fmt.Errorf("unpack request failed: %s", err))
 		return
 	}
 
-	if m.Id != 0 {
-		h.opts.Logger.Debug(fmt.Sprintf("irregular message id: %d", m.Id))
+	if m.ID != 0 {
+		h.opts.Logger.Debug(fmt.Sprintf("irregular message id: %d", m.ID))
 	}
 
 	r, err := h.opts.DNSHandler.ServeDNS(req.Context(), m, meta)
@@ -228,19 +228,18 @@ func (h *Handler) ServeHTTP(w ResponseWriter, req Request) {
 		return
 	}
 
-	b, buf, err := pool.PackBuffer(r)
+	err = r.Pack()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("pack response failed"))
 		h.warnErr(req, fmt.Errorf("pack response failed: %s", err))
 		return
 	}
-	defer buf.Release()
 
 	w.Header().Set("Content-Type", "application/dns-message")
 	w.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d", dnsutils.GetMinimalTTL(r)))
 	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write(b); err != nil {
+	if _, err := w.Write(r.Data); err != nil {
 		h.warnErr(req, fmt.Errorf("write response failed: %s", err))
 		return
 	}

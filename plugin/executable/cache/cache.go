@@ -24,9 +24,9 @@ import (
 	"fmt"
 	"time"
 
+	"codeberg.org/miekg/dns"
 	"github.com/go-redis/redis/v8"
 	"github.com/golang/snappy"
-	"github.com/miekg/dns"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
@@ -177,7 +177,7 @@ func (c *cachePlugin) Exec(ctx context.Context, qCtx *query_context.Context, nex
 	}
 	if cachedResp != nil { // cache hit
 		c.hitTotal.Inc()
-		cachedResp.Id = q.Id // change msg id
+		cachedResp.ID = q.ID // change msg id
 		c.L().Debug("cache hit", qCtx.InfoField())
 		qCtx.SetResponse(cachedResp)
 		qCtx.SetFrom("cache")
@@ -237,7 +237,8 @@ func (c *cachePlugin) lookupCache(msgKey string) (r *dns.Msg, lazyHit bool, err 
 			}
 		}
 		r = new(dns.Msg)
-		if err := r.Unpack(v); err != nil {
+		r.Data = v
+		if err := r.Unpack(); err != nil {
 			return nil, false, fmt.Errorf("failed to unpack cached data, %w", err)
 		}
 
@@ -299,7 +300,8 @@ func (c *cachePlugin) tryStoreMsg(key string, r *dns.Msg) error {
 		return nil
 	}
 
-	v, err := r.Pack()
+	err := r.Pack()
+	v := r.Data
 	if err != nil {
 		return fmt.Errorf("failed to pack response msg, %w", err)
 	}

@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 )
 
 const data = `
@@ -39,8 +39,7 @@ func TestMatcher(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	q := new(dns.Msg)
-	q.SetQuestion("example.com.", dns.TypeA)
+	q := dns.NewMsg("example.com.", dns.TypeA)
 	r := m.Reply(q)
 	if r == nil {
 		t.Fatal("search failed")
@@ -49,8 +48,7 @@ func TestMatcher(t *testing.T) {
 		t.Fatalf("want ip 192.0.2.1, got %s", got)
 	}
 
-	q = new(dns.Msg)
-	q.SetQuestion("1.example.com.", dns.TypeAAAA)
+	q = dns.NewMsg("1.example.com.", dns.TypeAAAA)
 	r = m.Reply(q)
 	if r == nil {
 		t.Fatal("search failed")

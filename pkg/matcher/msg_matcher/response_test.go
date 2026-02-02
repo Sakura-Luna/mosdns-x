@@ -20,10 +20,11 @@
 package msg_matcher
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/rdata"
 
 	"github.com/pmkol/mosdns-x/pkg/matcher/netlist"
 )
@@ -36,16 +37,16 @@ func TestAAAAAIPMatcher_MatchMsg(t *testing.T) {
 	nl.Sort()
 	m := NewAAAAAIPMatcher(nl)
 
-	ip1271 := net.ParseIP("127.0.0.1")
-	ip1281 := net.ParseIP("128.0.0.1")
+	ip1271, _ := netip.ParseAddr("127.0.0.1")
+	ip1281, _ := netip.ParseAddr("128.0.0.1")
 
 	msg := new(dns.Msg)
-	msg.Answer = []dns.RR{&dns.A{A: ip1281}, &dns.A{A: ip1271}}
+	msg.Answer = []dns.RR{&dns.A{A: rdata.A{Addr: ip1281}}, &dns.A{A: rdata.A{Addr: ip1271}}}
 	if matched, err := m.MatchMsg(msg); !matched || err != nil {
 		t.Fatal()
 	}
 
-	msg.Answer = []dns.RR{&dns.A{A: ip1281}}
+	msg.Answer = []dns.RR{&dns.A{A: rdata.A{Addr: ip1281}}}
 	if matched, err := m.MatchMsg(msg); matched || err != nil {
 		t.Fatal()
 	}

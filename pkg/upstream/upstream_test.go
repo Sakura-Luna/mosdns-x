@@ -24,13 +24,14 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
-
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 	"github.com/pmkol/mosdns-x/pkg/utils"
 )
 
@@ -44,9 +45,9 @@ func newUDPTestServer(t testing.TB, handler dns.Handler) (addr string, shutdownF
 		PacketConn: udpConn,
 		Handler:    handler,
 	}
-	go udpServer.ActivateAndServe()
+	go udpServer.ListenAndServe()
 	return udpAddr, func() {
-		udpServer.Shutdown()
+		udpServer.Shutdown(nil)
 	}
 }
 
@@ -61,9 +62,9 @@ func newTCPTestServer(t testing.TB, handler dns.Handler) (addr string, shutdownF
 		Handler:       handler,
 		MaxTCPQueries: -1,
 	}
-	go tcpServer.ActivateAndServe()
+	go tcpServer.ListenAndServe()
 	return tcpAddr, func() {
-		tcpServer.Shutdown()
+		tcpServer.Shutdown(nil)
 	}
 }
 
@@ -84,9 +85,9 @@ func newDoTTestServer(t testing.TB, handler dns.Handler) (addr string, shutdownF
 		Handler:       handler,
 		MaxTCPQueries: -1,
 	}
-	go doTServer.ActivateAndServe()
+	go doTServer.ListenAndServe()
 	return doTAddr, func() {
-		doTServer.Shutdown()
+		doTServer.Shutdown(nil)
 	}
 }
 
@@ -168,9 +169,8 @@ func testUpstream(u Upstream) error {
 		go func() {
 			defer wg.Done()
 
-			q := new(dns.Msg)
-			q.SetQuestion("example.com.", dns.TypeA)
-			q.Id = i
+			q := dns.NewMsg("example.com.", dns.TypeA)
+			q.ID = i
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 			r, err := u.ExchangeContext(ctx, q)
@@ -178,8 +178,8 @@ func testUpstream(u Upstream) error {
 				logErr(err)
 				return
 			}
-			if r.Id != q.Id {
-				logErr(dns.ErrId)
+			if r.ID != q.ID {
+				logErr(dns.ErrID)
 				return
 			}
 		}()
@@ -197,19 +197,19 @@ type vServer struct {
 	bigMsg  bool // with 1kb padding
 }
 
-var padding = make([]byte, 1024)
+var padding = dnsutil.MakePadding(1024)
 
-func (s *vServer) ServeDNS(w dns.ResponseWriter, q *dns.Msg) {
+func (s *vServer) ServeDNS(ctx context.Context, w dns.ResponseWriter, q *dns.Msg) {
 	r := new(dns.Msg)
-	r.SetReply(q)
+	dnsutil.SetReply(r, q)
 	if s.bigMsg {
-		r.SetEdns0(dns.MaxMsgSize, false)
-		opt := r.IsEdns0()
-		if opt != nil {
-			opt.Option = append(opt.Option, &dns.EDNS0_PADDING{Padding: padding})
+		r.UDPSize = dns.MaxMsgSize
+		if r.IsEdns0() {
+			r.Pseudo = append(r.Pseudo, padding)
 		}
 	}
 
 	time.Sleep(s.latency)
-	w.WriteMsg(r)
+	r.Pack()
+	io.Copy(w, r)
 }

@@ -22,7 +22,8 @@ package misc_optm
 import (
 	"context"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"github.com/pmkol/mosdns-x/coremain"
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
@@ -56,16 +57,15 @@ func (t *optm) Exec(ctx context.Context, qCtx *query_context.Context, next execu
 	// Block query that is unusual.
 	if isUnusualQuery(q) {
 		r := new(dns.Msg)
-		r.SetRcode(q, dns.RcodeRefused)
+		dnsutil.SetReply(r, q)
+		r.Rcode = dns.RcodeRefused
 		qCtx.SetResponse(r)
 		return nil
 	}
 
 	// limit edns0 udp size.
-	if opt := q.IsEdns0(); opt != nil {
-		if opt.UDPSize() > maxUDPSize {
-			opt.SetUDPSize(maxUDPSize)
-		}
+	if q.IsEdns0() && q.UDPSize > maxUDPSize {
+		q.UDPSize = maxUDPSize
 	}
 
 	if err := executable_seq.ExecChainNode(ctx, qCtx, next); err != nil {
@@ -78,19 +78,19 @@ func (t *optm) Exec(ctx context.Context, qCtx *query_context.Context, next execu
 	}
 
 	// Remove padding
-	if rOpt := r.IsEdns0(); rOpt != nil {
-		dnsutils.RemoveEDNS0Option(rOpt, dns.EDNS0PADDING)
+	if r.IsEdns0() {
+		dnsutils.RemoveEDNS0Option(r, dns.CodePADDING)
 	}
 
 	// EDNS0 consistency
-	if qOpt := q.IsEdns0(); qOpt == nil {
+	if !q.IsEdns0() {
 		dnsutils.RemoveEDNS0(r)
 	}
 	return nil
 }
 
 func isUnusualQuery(q *dns.Msg) bool {
-	return !isValidQuery(q) || len(q.Question) != 1 || q.Question[0].Qclass != dns.ClassINET
+	return !isValidQuery(q) || len(q.Question) != 1 || q.Question[0].Header().Class != dns.ClassINET
 }
 
 func isValidQuery(q *dns.Msg) bool {

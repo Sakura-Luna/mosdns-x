@@ -19,9 +19,9 @@
 
 package pool
 
-import (
-	"github.com/miekg/dns"
-)
+// import (
+// 	"codeberg.org/miekg/dns"
+// )
 
 // There is no such way to give dns.Msg.PackBuffer() a buffer
 // with a proper size.
@@ -30,12 +30,12 @@ const packBufSize = 4096
 
 // PackBuffer packs the dns msg m to wire format.
 // Callers should release the buf after they have done with the wire []byte.
-func PackBuffer(m *dns.Msg) (wire []byte, buf *Buffer, err error) {
-	buf = GetBuf(packBufSize)
-	wire, err = m.PackBuffer(buf.Bytes())
-	if err != nil {
-		buf.Release()
-		return nil, nil, err
-	}
-	return wire, buf, nil
-}
+// func PackBuffer(m *dns.Msg) (wire []byte, buf *Buffer, err error) {
+// 	buf = GetBuf(packBufSize)
+// 	wire, err = m.PackBuffer(buf.Bytes())
+// 	if err != nil {
+// 		buf.Release()
+// 		return nil, nil, err
+// 	}
+// 	return wire, buf, nil
+// }

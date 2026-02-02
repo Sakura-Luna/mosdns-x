@@ -24,7 +24,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
@@ -35,7 +35,7 @@ func Test_ECS(t *testing.T) {
 	mErr := errors.New("mErr")
 	eErr := errors.New("eErr")
 	target := new(dns.Msg)
-	target.Id = dns.Id()
+	target.ID = dns.ID()
 
 	tests := []struct {
 		name       string
@@ -203,8 +203,8 @@ exec:
 			}
 
 			gotTarget := qCtx.R()
-			if tt.wantTarget && gotTarget.Id != target.Id {
-				t.Errorf("Exec() gotTarget = %d, want %d", gotTarget.Id, target.Id)
+			if tt.wantTarget && gotTarget.ID != target.ID {
+				t.Errorf("Exec() gotTarget = %d, want %d", gotTarget.ID, target.ID)
 			}
 		})
 	}
@@ -213,7 +213,7 @@ exec:
 func Test_LoadBalance(t *testing.T) {
 	eErr := errors.New("eErr")
 	target := new(dns.Msg)
-	target.Id = dns.Id()
+	target.ID = dns.ID()
 
 	type want struct {
 		target bool
@@ -301,8 +301,8 @@ exec:
 					}
 
 					gotTarget := qCtx.R()
-					if want.target && gotTarget.Id != target.Id {
-						t.Errorf("Exec() gotTarget = %d, want %d", gotTarget.Id, target.Id)
+					if want.target && gotTarget.ID != target.ID {
+						t.Errorf("Exec() gotTarget = %d, want %d", gotTarget.ID, target.ID)
 					}
 				}
 			}

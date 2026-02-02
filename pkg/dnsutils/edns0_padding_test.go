@@ -20,27 +20,24 @@
 package dnsutils
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 )
 
 func TestPadToMinimum(t *testing.T) {
-	q := new(dns.Msg)
-	q.SetQuestion(".", dns.TypeA)
+	q := dns.NewMsg(".", dns.TypeA)
 
 	qEDNS0 := q.Copy()
 	UpgradeEDNS0(qEDNS0)
 
 	qPadded := qEDNS0.Copy()
-	opt := qPadded.IsEdns0()
-	if opt != nil {
-		opt.Option = append(opt.Option, &dns.EDNS0_PADDING{Padding: make([]byte, 16)})
-	}
+	qPadded.Pseudo = []dns.RR{dnsutil.MakePadding(16)}
 
-	qLarge := new(dns.Msg)
-	qLarge.SetQuestion(strings.Repeat("a.", 100), dns.TypeA)
+	qLarge := dns.NewMsg(strings.Repeat("a.", 100), dns.TypeA)
 
 	tests := []struct {
 		name           string
@@ -51,21 +48,30 @@ func TestPadToMinimum(t *testing.T) {
 		wantNewPadding bool
 	}{
 		{"", q.Copy(), 128, 128, true, true},
-		{"", qLarge.Copy(), 128, qLarge.Len(), false, false},
+		{"", qLarge.Copy(), 128, 217, false, false},
 		{"", qEDNS0.Copy(), 128, 128, false, true},
 		{"", qPadded.Copy(), 128, 128, false, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotUpgraded, gotNewPadding := PadToMinimum(tt.q, tt.minLen)
+			m := tt.q
+			gotUpgraded, gotNewPadding := PadToMinimum(m, tt.minLen)
 			if gotUpgraded != tt.wantUpgraded {
 				t.Errorf("pad() gotUpgraded = %v, want %v", gotUpgraded, tt.wantUpgraded)
 			}
 			if gotNewPadding != tt.wantNewPadding {
 				t.Errorf("pad() gotNewPadding = %v, want %v", gotNewPadding, tt.wantNewPadding)
 			}
-			if qLen := tt.q.Len(); qLen != tt.wantLen {
+			m.Pack()
+			b := m.Data
+			m.Data = make([]byte, len(b))
+			if qLen := len(b); qLen != tt.wantLen {
 				t.Errorf("pad() query length = %v, want %v", qLen, tt.wantLen)
+			}
+			m.Pad(128)
+			m.Pack()
+			if len(b) == len(m.Data) && !bytes.Equal(m.Data, b) {
+				t.Errorf("pad() data = %v, want %v", b, m.Data)
 			}
 		})
 	}

@@ -21,10 +21,9 @@ package msg_matcher
 
 import (
 	"context"
-	"net"
 	"net/netip"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 
 	"github.com/pmkol/mosdns-x/pkg/matcher/domain"
 	"github.com/pmkol/mosdns-x/pkg/matcher/elem"
@@ -51,17 +50,16 @@ func (m *AAAAAIPMatcher) Match(_ context.Context, qCtx *query_context.Context) (
 
 func (m *AAAAAIPMatcher) MatchMsg(msg *dns.Msg) (bool, error) {
 	for _, rr := range msg.Answer {
-		var ip net.IP
+		var ip netip.Addr
 		switch rr := rr.(type) {
 		case *dns.A:
-			ip = rr.A
+			ip = rr.A.Addr
 		case *dns.AAAA:
-			ip = rr.AAAA
+			ip = rr.AAAA.Addr
 		default:
 			continue
 		}
-		addr, _ := netip.AddrFromSlice(ip)
-		matched, err := m.ipMatcher.Match(addr)
+		matched, err := m.ipMatcher.Match(ip)
 		if err != nil {
 			return false, err
 		}

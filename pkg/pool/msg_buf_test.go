@@ -19,21 +19,21 @@
 
 package pool
 
-import (
-	"testing"
-
-	"github.com/miekg/dns"
-)
-
-func TestPackBuffer_No_Allocation(t *testing.T) {
-	m := new(dns.Msg)
-	m.SetQuestion("123.", dns.TypeAAAA)
-	wire, buf, err := PackBuffer(m)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if cap(wire) != buf.Cap() {
-		t.Fatalf("wire and buf have different cap, wire %d, buf %d", cap(wire), buf.Cap())
-	}
-}
+// import (
+// 	"testing"
+//
+// 	"github.com/miekg/dns"
+// )
+//
+// func TestPackBuffer_No_Allocation(t *testing.T) {
+// 	m := new(dns.Msg)
+// 	m.SetQuestion("123.", dns.TypeAAAA)
+// 	wire, buf, err := PackBuffer(m)
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+//
+// 	if cap(wire) != buf.Cap() {
+// 		t.Fatalf("wire and buf have different cap, wire %d, buf %d", cap(wire), buf.Cap())
+// 	}
+// }

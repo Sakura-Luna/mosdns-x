@@ -21,11 +21,13 @@ package dual_selector
 
 import (
 	"context"
-	"net"
+	"net/netip"
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
+	"codeberg.org/miekg/dns/rdata"
 
 	"github.com/pmkol/mosdns-x/coremain"
 	"github.com/pmkol/mosdns-x/pkg/executable_seq"
@@ -42,25 +44,25 @@ type dummyNext struct {
 func (d *dummyNext) Exec(_ context.Context, qCtx *query_context.Context, _ executable_seq.ExecutableChainNode) error {
 	q := qCtx.Q()
 	r := new(dns.Msg)
-	r.SetReply(q)
+	dnsutil.SetReply(r, q)
 	question := q.Question[0]
-	rrh := dns.RR_Header{
-		Name:   question.Name,
-		Rrtype: question.Qtype,
-		Class:  question.Qclass,
+	rrh := dns.Header{
+		Name:  question.Header().Name,
+		Class: question.Header().Class,
 	}
 
-	if question.Qtype == dns.TypeA && d.returnA {
+	addr, _ := netip.ParseAddr("1.2.3.4")
+	if dns.RRToType(question) == dns.TypeA && d.returnA {
 		r.Answer = append(r.Answer, &dns.A{
 			Hdr: rrh,
-			A:   net.IPv4(1, 2, 3, 4),
+			A:   rdata.A{Addr: addr},
 		})
 		time.Sleep(d.latencyA)
 	}
-	if question.Qtype == dns.TypeAAAA && d.returnAAAA {
+	if dns.RRToType(question) == dns.TypeAAAA && d.returnAAAA {
 		r.Answer = append(r.Answer, &dns.AAAA{
 			Hdr:  rrh,
-			AAAA: net.IPv4(1, 2, 3, 4),
+			AAAA: rdata.AAAA{Addr: addr},
 		})
 		time.Sleep(d.latencyAAAA)
 	}
@@ -158,8 +160,7 @@ func TestSelector_Exec(t *testing.T) {
 				waitTimeout: time.Millisecond * 20,
 			}
 
-			q := new(dns.Msg)
-			q.SetQuestion("example.", tt.qtype)
+			q := dns.NewMsg("example.", tt.qtype)
 			qCtx := query_context.NewContext(q, nil)
 			if err := s.Exec(context.Background(), qCtx, tt.next); (err != nil) != tt.wantErr {
 				t.Errorf("Exec() error = %v, wantErr %v", err, tt.wantErr)

@@ -21,6 +21,7 @@ package ttl
 
 import (
 	"context"
+	"errors"
 
 	"github.com/pmkol/mosdns-x/coremain"
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
@@ -49,24 +50,22 @@ type ttl struct {
 }
 
 func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
-	return newTTL(bp, args.(*Args)), nil
+	return newTTL(bp, args.(*Args))
 }
 
-func newTTL(bp *coremain.BP, args *Args) coremain.Plugin {
-	return &ttl{
-		BP:   bp,
-		args: args,
+func newTTL(bp *coremain.BP, args *Args) (coremain.Plugin, error) {
+	if args.MaximumTTL > 0 && args.MinimalTTL > 0 && args.MinimalTTL > args.MaximumTTL {
+		return nil, errors.New("invalid ttl")
 	}
+	return &ttl{BP: bp, args: args}, nil
 }
 
 func (t *ttl) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
 	if r := qCtx.R(); r != nil {
-		if t.args.MaximumTTL > 0 {
-			dnsutils.ApplyMaximumTTL(r, t.args.MaximumTTL)
+		if len(r.Answer) == 0 && len(r.Ns) == 0 && len(r.Extra) == 0 {
+			r.Ns = append(r.Ns, dnsutils.FakeSOA(r.Question[0].Header().Name))
 		}
-		if t.args.MinimalTTL > 0 {
-			dnsutils.ApplyMinimalTTL(r, t.args.MinimalTTL)
-		}
+		dnsutils.ApplyTTL(r, t.args.MaximumTTL, t.args.MinimalTTL)
 	}
 	return executable_seq.ExecChainNode(ctx, qCtx, next)
 }

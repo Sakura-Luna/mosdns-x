@@ -20,22 +20,15 @@
 package doh
 
 import (
-	"bytes"
 	"context"
-	"fmt"
+	"io"
 	"net/url"
-	"strconv"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 	"gitlab.com/go-extension/http"
 
 	C "github.com/pmkol/mosdns-x/constant"
-	"github.com/pmkol/mosdns-x/pkg/pool"
 )
-
-const dnsContentType = "application/dns-message"
-
-var bufPool = pool.NewBytesBufPool(65535)
 
 type Upstream struct {
 	url       *url.URL
@@ -47,43 +40,31 @@ func NewUpstream(url *url.URL, transport *http.Transport) *Upstream {
 }
 
 func (u *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, error) {
-	q.Id = 0
-	wire, buf, err := pool.PackBuffer(q)
+	// q.Id = 0
+	err := q.Pack()
 	if err != nil {
 		return nil, err
 	}
-	defer buf.Release()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.url.String(), bytes.NewReader(wire))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.url.String(), q)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", dnsContentType)
-	req.Header.Set("Accept", dnsContentType)
-	req.Header.Set("User-Agent", fmt.Sprintf("mosdns-x/%s", C.Version))
+	C.MakeHeader(req)
 	res, err := u.transport.RoundTrip(req)
 	if err != nil {
 		return nil, err
 	}
-	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("unexpected status %v: %s", res.StatusCode, res.Status)
-	}
-	if contentType := res.Header.Get("Content-Type"); contentType != dnsContentType {
-		return nil, fmt.Errorf("unexpected content type: %s", contentType)
-	}
-	if contentLength := res.Header.Get("Content-Length"); contentLength != "" {
-		if length, err := strconv.Atoi(contentLength); err == nil && length == 0 {
-			return nil, fmt.Errorf("empty response")
-		}
-	}
 	defer res.Body.Close()
-	bb := bufPool.Get()
-	defer bufPool.Release(bb)
-	_, err = bb.ReadFrom(res.Body)
+	if err = C.DealResponse(res); err != nil {
+		return nil, err
+	}
+
+	r := new(dns.Msg)
+	r.Data, err = io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
 	}
-	r := new(dns.Msg)
-	err = r.Unpack(bb.Bytes())
+	err = r.Unpack()
 	if err != nil {
 		return nil, err
 	}

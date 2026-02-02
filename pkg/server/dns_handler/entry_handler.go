@@ -25,7 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 	"go.uber.org/zap"
 
 	"github.com/pmkol/mosdns-x/pkg/executable_seq"
@@ -106,13 +107,13 @@ func (h *EntryHandler) ServeDNS(ctx context.Context, req *dns.Msg, meta *query_c
 		return h.responseFormErr(req), nil
 	}
 	for _, question := range req.Question {
-		if _, ok := dns.IsDomainName(question.Name); !ok {
-			h.opts.Logger.Warn("invalid question name: " + question.Name)
+		if ok := dnsutil.IsName(question.Header().Name); !ok {
+			h.opts.Logger.Warn("invalid question name: " + question.Header().Name)
 			return h.responseFormErr(req), nil
 		}
 	}
 	// cache original id
-	id := req.Id
+	id := req.ID
 
 	// exec entry
 	qCtx := query_context.NewContext(req, meta)
@@ -131,20 +132,20 @@ func (h *EntryHandler) ServeDNS(ctx context.Context, req *dns.Msg, meta *query_c
 
 	if respMsg == nil || err != nil {
 		respMsg = new(dns.Msg)
-		respMsg.SetReply(req)
+		dnsutil.SetReply(respMsg, req)
 		respMsg.Rcode = dns.RcodeServerFailure
 	}
 
 	if h.opts.RecursionAvailable {
 		respMsg.RecursionAvailable = true
 	}
-	respMsg.Id = id
+	respMsg.ID = id
 	return respMsg, nil
 }
 
 func (h *EntryHandler) responseFormErr(req *dns.Msg) *dns.Msg {
 	res := new(dns.Msg)
-	res.SetReply(req)
+	dnsutil.SetReply(res, req)
 	res.Rcode = dns.RcodeFormatError
 	if h.opts.RecursionAvailable {
 		res.RecursionAvailable = true
@@ -166,10 +167,10 @@ func (d *DummyServerHandler) ServeDNS(_ context.Context, req *dns.Msg, meta *que
 	var resp *dns.Msg
 	if d.WantMsg != nil {
 		resp = d.WantMsg.Copy()
-		resp.Id = req.Id
+		resp.ID = req.ID
 	} else {
 		resp = new(dns.Msg)
-		resp.SetReply(req)
+		dnsutil.SetReply(resp, req)
 	}
 	return resp, nil
 }

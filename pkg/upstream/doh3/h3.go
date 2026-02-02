@@ -20,24 +20,19 @@
 package doh3
 
 import (
-	"bytes"
 	"context"
-	"fmt"
+	"crypto/tls"
+	"io"
 	"net/http"
 	"net/url"
-	"strconv"
-	"time"
+	"strings"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 	"github.com/quic-go/quic-go/http3"
+	"golang.org/x/sync/singleflight"
 
 	C "github.com/pmkol/mosdns-x/constant"
-	"github.com/pmkol/mosdns-x/pkg/pool"
 )
-
-const dnsContentType = "application/dns-message"
-
-var bufPool = pool.NewBytesBufPool(65535)
 
 type Upstream struct {
 	url       *url.URL
@@ -49,45 +44,41 @@ func NewUpstream(url *url.URL, transport *http3.Transport) *Upstream {
 }
 
 func (u *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	q.Id = 0
-	wire, buf, err := pool.PackBuffer(q)
+	// q.Id = 0
+	err := q.Pack()
 	if err != nil {
 		return nil, err
 	}
-	defer buf.Release()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.url.String(), bytes.NewReader(wire))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.url.String(), q)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", dnsContentType)
-	req.Header.Set("Accept", dnsContentType)
-	req.Header.Set("User-Agent", fmt.Sprintf("mosdns-x/%s", C.Version))
+	C.MakeHeader(req)
+
+	var group singleflight.Group
 	res, err := u.transport.RoundTrip(req)
 	if err != nil {
+		if strings.HasSuffix(err.Error(), "0-RTT rejected") {
+			group.Do("refresh", func() (any, error) {
+				tlsConf := u.transport.TLSClientConfig.Clone()
+				tlsConf.ClientSessionCache = tls.NewLRUClientSessionCache(64)
+				u.transport.TLSClientConfig = tlsConf
+				return nil, nil
+			})
+		}
 		return nil, err
 	}
 	defer res.Body.Close()
-	if res.StatusCode < 200 || res.StatusCode > 299 {
-		return nil, fmt.Errorf("unexpected status %v: %s", res.StatusCode, res.Status)
+	if err = C.DealResponse(res); err != nil {
+		return nil, err
 	}
-	if contentType := res.Header.Get("Content-Type"); contentType != dnsContentType {
-		return nil, fmt.Errorf("unexpected content type: %s", contentType)
-	}
-	if contentLength := res.Header.Get("Content-Length"); contentLength != "" {
-		if length, err := strconv.Atoi(contentLength); err == nil && length == 0 {
-			return nil, fmt.Errorf("empty response")
-		}
-	}
-	bb := bufPool.Get()
-	defer bufPool.Release(bb)
-	_, err = bb.ReadFrom(res.Body)
+
+	r := new(dns.Msg)
+	r.Data, err = io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
 	}
-	r := new(dns.Msg)
-	err = r.Unpack(bb.Bytes())
+	err = r.Unpack()
 	if err != nil {
 		return nil, err
 	}

@@ -19,42 +19,40 @@
 
 package dnsutils
 
-import "github.com/miekg/dns"
+import (
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
+)
 
 // PadToMinimum pads m to the minimum length.
 // If the length of m is larger than minLen, PadToMinimum won't do anything.
 // upgraded indicates the m was upgraded to an EDNS0 msg.
 // newPadding indicates the Padding option is new to m.
 func PadToMinimum(m *dns.Msg, minLen int) (upgraded, newPadding bool) {
-	l := m.Len()
-	if l >= minLen {
+	err := m.Pack()
+	l := len(m.Data)
+	if err != nil || l >= minLen {
 		return false, false
 	}
 
-	opt := m.IsEdns0()
-	if opt != nil {
-		if edns0 := GetEDNS0Option(opt, dns.EDNS0PADDING); edns0 != nil { // q is padded.
-			pd := edns0.(*dns.EDNS0_PADDING)
-			paddingLen := minLen - l + len(pd.Padding)
-			if paddingLen < 0 {
-				return false, false
-			}
-			pd.Padding = make([]byte, paddingLen)
-			return false, false
+	paddingLen := 0
+	edns0 := m.IsEdns0()
+	if edns0 {
+		if pad := GetEDNS0Option(m, dns.CodePADDING); pad != nil { // q is padded.
+			paddingLen = minLen - (l - pad.Len() + 4)
+			RemoveEDNS0Option(m, dns.CodePADDING)
+		} else {
+			paddingLen = minLen - l - 4 // a Padding option has a 4 bytes header.
+			newPadding = true
 		}
-		paddingLen := minLen - 4 - l // a Padding option has a 4 bytes header.
-		if paddingLen < 0 {
-			return false, false
-		}
-		opt.Option = append(opt.Option, &dns.EDNS0_PADDING{Padding: make([]byte, paddingLen)})
-		return false, true
+	} else {
+		paddingLen = minLen - l - 15 // 4 bytes padding header + 11 bytes EDNS0 header.
+		upgraded, newPadding = true, true
 	}
 
-	paddingLen := minLen - 15 - l // 4 bytes padding header + 11 bytes EDNS0 header.
 	if paddingLen < 0 {
 		return false, false
 	}
-	opt = UpgradeEDNS0(m)
-	opt.Option = append(opt.Option, &dns.EDNS0_PADDING{Padding: make([]byte, paddingLen)})
-	return true, true
+	m.Pseudo = append(m.Pseudo, dnsutil.MakePadding(paddingLen))
+	return upgraded, newPadding
 }

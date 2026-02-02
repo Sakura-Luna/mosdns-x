@@ -23,7 +23,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 	"go.uber.org/zap"
 
 	"github.com/pmkol/mosdns-x/coremain"
@@ -43,13 +43,13 @@ func init() {
 	coremain.RegNewPresetPluginFunc(
 		"_qtype_A_AAAA",
 		func(bp *coremain.BP) (coremain.Plugin, error) {
-			return newQueryMatcher(bp, &Args{QType: []int{int(dns.TypeA), int(dns.TypeAAAA)}})
+			return newQueryMatcher(bp, &Args{QType: []uint16{dns.TypeA, dns.TypeAAAA}})
 		},
 	)
 	coremain.RegNewPresetPluginFunc(
 		"_qtype_AAAA",
 		func(bp *coremain.BP) (coremain.Plugin, error) {
-			return newQueryMatcher(bp, &Args{QType: []int{int(dns.TypeAAAA)}})
+			return newQueryMatcher(bp, &Args{QType: []uint16{dns.TypeAAAA}})
 		},
 	)
 
@@ -67,8 +67,8 @@ type Args struct {
 	ClientIP []string `yaml:"client_ip"`
 	ECS      []string `yaml:"ecs"`
 	Domain   []string `yaml:"domain"`
-	QType    []int    `yaml:"qtype"`
-	QClass   []int    `yaml:"qclass"`
+	QType    []uint16 `yaml:"qtype"`
+	QClass   []uint16 `yaml:"qclass"`
 	// TODO: Add PTR matcher.
 }
 
@@ -141,5 +141,5 @@ type queryIsEDNS0 struct {
 }
 
 func (q *queryIsEDNS0) Match(_ context.Context, qCtx *query_context.Context) (matched bool, err error) {
-	return qCtx.Q().IsEdns0() != nil, nil
+	return qCtx.Q().IsEdns0(), nil
 }

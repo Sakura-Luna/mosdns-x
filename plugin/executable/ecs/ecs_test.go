@@ -21,11 +21,11 @@ package ecs
 
 import (
 	"context"
-	"net"
 	"net/netip"
 	"testing"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"github.com/pmkol/mosdns-x/coremain"
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
@@ -68,22 +68,21 @@ func Test_ecsPlugin(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			q := new(dns.Msg)
-			q.SetQuestion(".", tt.qtype)
+			q := dns.NewMsg(".", tt.qtype)
 			r := new(dns.Msg)
-			r.SetReply(q)
+			dnsutil.SetReply(r, q)
 
 			if tt.qHasEDNS0 {
-				optQ := dnsutils.UpgradeEDNS0(q)
-				optR := dnsutils.UpgradeEDNS0(r)
+				dnsutils.UpgradeEDNS0(q)
+				dnsutils.UpgradeEDNS0(r)
 
 				if len(tt.qHasECS) > 0 {
 					ip, err := netip.ParseAddr(tt.qHasECS)
 					if err != nil {
 						t.Fatal(err)
 					}
-					dnsutils.AddECS(optR, dnsutils.NewEDNS0Subnet(net.IPv6loopback, 24, false), true)
-					dnsutils.AddECS(optQ, dnsutils.NewEDNS0Subnet(ip.AsSlice(), 24, false), true)
+					dnsutils.AddECS(q, dnsutils.NewEDNS0Subnet(netip.IPv6Loopback(), 24, false), true)
+					dnsutils.AddECS(q, dnsutils.NewEDNS0Subnet(ip, 24, false), true)
 				}
 			}
 
@@ -104,20 +103,20 @@ func Test_ecsPlugin(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			var qECS net.IP
-			e := dnsutils.GetMsgECS(q)
+			var qECS netip.Addr
+			e := dnsutils.GetECS(q)
 			if e != nil {
 				qECS = e.Address
 			}
-			wantAddr := net.ParseIP(tt.wantAddr)
-			if !qECS.Equal(wantAddr) {
+			wantAddr, _ := netip.ParseAddr(tt.wantAddr)
+			if qECS != wantAddr {
 				t.Fatalf("want addr %v, got %v", tt.wantAddr, qECS)
 			}
 
-			if res := dnsutils.GetMsgECS(qCtx.R()) != nil; res != tt.rWantECS {
+			if res := dnsutils.GetECS(qCtx.R()) != nil; res != tt.rWantECS {
 				t.Fatalf("want rWantECS %v, got %v", tt.rWantECS, res)
 			}
-			if res := qCtx.R().IsEdns0() != nil; res != tt.rWantEDNS0 {
+			if res := qCtx.R().IsEdns0(); res != tt.rWantEDNS0 {
 				t.Fatalf("want rWantEDNS0 %v, got %v", tt.rWantEDNS0, res)
 			}
 		})

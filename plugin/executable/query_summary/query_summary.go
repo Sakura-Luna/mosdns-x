@@ -24,6 +24,7 @@ import (
 	"errors"
 	"time"
 
+	"codeberg.org/miekg/dns"
 	"go.uber.org/zap"
 
 	"github.com/pmkol/mosdns-x/coremain"
@@ -97,7 +98,7 @@ func (l *logger) Exec(ctx context.Context, qCtx *C.Context, next executable_seq.
 	question := q.Question[0]
 	respRcode := -1
 	if r := qCtx.R(); r != nil {
-		respRcode = r.Rcode
+		respRcode = int(r.Rcode)
 	}
 
 	inboundInfo := []zap.Field{zap.Uint32("uqid", qCtx.Id())}
@@ -111,9 +112,9 @@ func (l *logger) Exec(ctx context.Context, qCtx *C.Context, next executable_seq.
 		}
 	}
 	inboundInfo = append(inboundInfo,
-		zap.String("qname", question.Name),
-		zap.Uint16("qtype", question.Qtype),
-		zap.Uint16("qclass", question.Qclass),
+		zap.String("qname", question.Header().Name),
+		zap.Uint16("qtype", dns.RRToType(question)),
+		zap.Uint16("qclass", question.Header().Class),
 		zap.Int("resp_rcode", respRcode),
 		zap.Duration("elapsed", time.Since(qCtx.StartTime())))
 

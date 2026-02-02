@@ -24,7 +24,9 @@ import (
 	"fmt"
 	"net/netip"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
+	"codeberg.org/miekg/dns/rdata"
 
 	"github.com/pmkol/mosdns-x/coremain"
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
@@ -121,23 +123,23 @@ func (b *blackHole) exec(qCtx *query_context.Context) {
 		return
 	}
 
-	qName := q.Question[0].Name
-	qtype := q.Question[0].Qtype
+	qName := q.Question[0].Header().Name
+	qtype := dns.RRToType(q.Question[0])
 
 	switch {
 	case qtype == dns.TypeA && len(b.ipv4) > 0:
 		r := new(dns.Msg)
-		r.SetRcode(q, dns.RcodeSuccess)
+		dnsutil.SetReply(r, q)
+		r.Rcode = dns.RcodeSuccess
 		r.RecursionAvailable = true
 		for _, addr := range b.ipv4 {
 			rr := &dns.A{
-				Hdr: dns.RR_Header{
-					Name:   qName,
-					Rrtype: dns.TypeA,
-					Class:  dns.ClassINET,
-					Ttl:    3600,
+				Hdr: dns.Header{
+					Name:  qName,
+					Class: dns.ClassINET,
+					TTL:   3600,
 				},
-				A: addr.AsSlice(),
+				A: rdata.A{Addr: addr},
 			}
 			r.Answer = append(r.Answer, rr)
 		}
@@ -145,24 +147,24 @@ func (b *blackHole) exec(qCtx *query_context.Context) {
 
 	case qtype == dns.TypeAAAA && len(b.ipv6) > 0:
 		r := new(dns.Msg)
-		r.SetRcode(q, dns.RcodeSuccess)
+		dnsutil.SetReply(r, q)
+		r.Rcode = dns.RcodeSuccess
 		r.RecursionAvailable = true
 		for _, addr := range b.ipv6 {
 			rr := &dns.AAAA{
-				Hdr: dns.RR_Header{
-					Name:   qName,
-					Rrtype: dns.TypeAAAA,
-					Class:  dns.ClassINET,
-					Ttl:    3600,
+				Hdr: dns.Header{
+					Name:  qName,
+					Class: dns.ClassINET,
+					TTL:   3600,
 				},
-				AAAA: addr.AsSlice(),
+				AAAA: rdata.AAAA{Addr: addr},
 			}
 			r.Answer = append(r.Answer, rr)
 		}
 		qCtx.SetResponse(r)
 
 	case b.args.RCode >= 0:
-		r := dnsutils.GenEmptyReply(q, b.args.RCode)
+		r := dnsutils.GenEmptyReply(q, uint16(b.args.RCode))
 		qCtx.SetResponse(r)
 	default:
 		qCtx.SetResponse(nil)

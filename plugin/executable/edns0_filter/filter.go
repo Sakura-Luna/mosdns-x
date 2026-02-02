@@ -22,7 +22,7 @@ package edns0_filter
 import (
 	"context"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 
 	"github.com/pmkol/mosdns-x/coremain"
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
@@ -38,7 +38,7 @@ func init() {
 		return NewFilter(bp, &Args{NoEDNS: true}), nil
 	})
 	coremain.RegNewPresetPluginFunc("_edns0_filter_ecs_only", func(bp *coremain.BP) (coremain.Plugin, error) {
-		return NewFilter(bp, &Args{Keep: []uint16{dns.EDNS0SUBNET}}), nil
+		return NewFilter(bp, &Args{Keep: []uint16{dns.CodeSUBNET}}), nil
 	})
 }
 
@@ -95,34 +95,33 @@ func (s *Filter) applyFilter(q *dns.Msg) {
 	case s.args.NoEDNS:
 		dnsutils.RemoveEDNS0(q)
 	case len(s.keep) > 0:
-		opt := q.IsEdns0()
-		if opt == nil || len(opt.Option) == 0 {
+		if !q.IsEdns0() {
 			break
 		}
-		opts := opt.Option[:0]
-		for i := range opt.Option {
-			if _, accept := s.keep[opt.Option[i].Option()]; accept {
-				opts = append(opts, opt.Option[i])
+		ps := q.Pseudo
+		edns0 := ps[:0]
+		for _, rr := range ps {
+			if _, accept := s.keep[dns.RRToCode(rr.(dns.EDNS0))]; accept {
+				edns0 = append(edns0, rr)
 			}
 		}
-		opt.Option = opts
+		q.Pseudo = edns0
 	case len(s.discard) > 0:
-		opt := q.IsEdns0()
-		if opt == nil || len(opt.Option) == 0 {
+		if !q.IsEdns0() {
 			break
 		}
-		opts := opt.Option[:0]
-		for i := range opt.Option {
-			if _, remove := s.discard[opt.Option[i].Option()]; !remove {
-				opts = append(opts, opt.Option[i])
+		ps := q.Pseudo
+		edns0 := ps[:0]
+		for _, rr := range ps {
+			if _, remove := s.discard[dns.RRToCode(rr.(dns.EDNS0))]; !remove {
+				edns0 = append(edns0, rr)
 			}
 		}
-		opt.Option = opts
+		q.Pseudo = edns0
 	default: // remove all edns0 options
-		opt := q.IsEdns0()
-		if opt == nil || len(opt.Option) == 0 {
+		if !q.IsEdns0() {
 			break
 		}
-		opt.Option = make([]dns.EDNS0, 0)
+		dnsutils.RemoveEDNS0(q)
 	}
 }

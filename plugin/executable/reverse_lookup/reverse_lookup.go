@@ -22,13 +22,14 @@ package reverselookup
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"net/netip"
 	"time"
 
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
+	"codeberg.org/miekg/dns/rdata"
 	"github.com/go-redis/redis/v8"
-	"github.com/miekg/dns"
 
 	"github.com/pmkol/mosdns-x/coremain"
 	"github.com/pmkol/mosdns-x/pkg/cache"
@@ -143,9 +144,9 @@ func (p *reverseLookup) lookup(n netip.Addr) string {
 }
 
 func (p *reverseLookup) handlePTRQuery(q *dns.Msg) *dns.Msg {
-	if p.args.HandlePTR && len(q.Question) > 0 && q.Question[0].Qtype == dns.TypePTR {
+	if p.args.HandlePTR && len(q.Question) > 0 && dns.RRToType(q.Question[0]) == dns.TypePTR {
 		question := q.Question[0]
-		addr, _ := utils.ParsePTRName(question.Name)
+		addr, _ := utils.ParsePTRName(question.Header().Name)
 		// If we cannot parse this ptr name. Just ignore it and pass query to next node.
 		// PTR standards are a mess.
 		if !addr.IsValid() {
@@ -154,15 +155,16 @@ func (p *reverseLookup) handlePTRQuery(q *dns.Msg) *dns.Msg {
 		fqdn := p.lookup(addr)
 		if len(fqdn) > 0 {
 			r := new(dns.Msg)
-			r.SetReply(q)
+			dnsutil.SetReply(r, q)
 			r.Answer = append(r.Answer, &dns.PTR{
-				Hdr: dns.RR_Header{
-					Name:   question.Name,
-					Rrtype: question.Qtype,
-					Class:  question.Qclass,
-					Ttl:    5,
+				Hdr: dns.Header{
+					Name:  question.Header().Name,
+					Class: question.Header().Class,
+					TTL:   5,
 				},
-				Ptr: fqdn,
+				PTR: rdata.PTR{
+					Ptr: fqdn,
+				},
 			})
 			return r
 		}
@@ -177,27 +179,24 @@ func (p *reverseLookup) saveIPs(q, r *dns.Msg) {
 
 	now := time.Now()
 	for _, rr := range r.Answer {
-		var ip net.IP
+		var ip netip.Addr
 		switch rr := rr.(type) {
 		case *dns.A:
-			ip = rr.A
+			ip = rr.A.Addr
 		case *dns.AAAA:
-			ip = rr.AAAA
+			ip = rr.AAAA.Addr
 		default:
 			continue
 		}
 
-		addr, ok := netip.AddrFromSlice(ip)
-		if !ok {
-			continue
-		}
+		addr := ip
 		h := rr.Header()
-		if int(h.Ttl) > p.args.TTL {
-			h.Ttl = uint32(p.args.TTL)
+		if int(h.TTL) > p.args.TTL {
+			h.TTL = uint32(p.args.TTL)
 		}
 		name := h.Name
 		if len(q.Question) == 1 {
-			name = q.Question[0].Name
+			name = q.Question[0].Header().Name
 		}
 		p.c.Store(as16(addr).String(), []byte(name), now, now.Add(time.Duration(p.args.TTL)*time.Second))
 	}
