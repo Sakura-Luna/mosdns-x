@@ -39,7 +39,7 @@ import (
 const PluginType = "redirect"
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 }
 
 var _ coremain.ExecutablePlugin = (*redirectPlugin)(nil)
@@ -53,7 +53,7 @@ type redirectPlugin struct {
 	m *domain.MatcherGroup[string]
 }
 
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return newRedirect(bp, args.(*Args))
 }
 
@@ -91,20 +91,20 @@ func newRedirect(bp *coremain.BP, args *Args) (*redirectPlugin, error) {
 	}, nil
 }
 
-func (r *redirectPlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (r *redirectPlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	q := qCtx.Q()
 	if len(q.Question) != 1 || q.Question[0].Header().Class != dns.ClassINET {
-		return executable_seq.ExecChainNode(ctx, qCtx, next)
+		return executable_seq.ExecChain(ctx, qCtx, next)
 	}
 
 	orgQName := q.Question[0].Header().Name
 	redirectTarget, ok := r.m.Match(orgQName)
 	if !ok {
-		return executable_seq.ExecChainNode(ctx, qCtx, next)
+		return executable_seq.ExecChain(ctx, qCtx, next)
 	}
 
 	q.Question[0].Header().Name = redirectTarget
-	err := executable_seq.ExecChainNode(ctx, qCtx, next)
+	err := executable_seq.ExecChain(ctx, qCtx, next)
 	if r := qCtx.R(); r != nil {
 		// Restore original query name.
 		for i := range r.Question {

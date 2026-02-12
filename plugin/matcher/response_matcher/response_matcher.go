@@ -39,7 +39,7 @@ import (
 const PluginType = "response_matcher"
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 
 	coremain.RegNewPresetPluginFunc("_valid_answer", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &hasValidAnswer{BP: bp}, nil
@@ -79,7 +79,7 @@ func (m *responseMatcher) Close() error {
 	return nil
 }
 
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return newResponseMatcher(bp, args.(*Args))
 }
 

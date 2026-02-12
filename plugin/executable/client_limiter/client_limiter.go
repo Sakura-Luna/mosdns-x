@@ -36,7 +36,7 @@ import (
 const PluginType = "client_limiter"
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 }
 
 type Args struct {
@@ -72,10 +72,10 @@ func NewLimiter(bp *coremain.BP, args *Args) (*Limiter, error) {
 	return l, nil
 }
 
-func (l *Limiter) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (l *Limiter) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	addr := qCtx.ReqMeta().GetClientAddr()
 	if !addr.IsValid() {
-		return executable_seq.ExecChainNode(ctx, qCtx, next)
+		return executable_seq.ExecChain(ctx, qCtx, next)
 	}
 	if ok := l.hpLimiter.AcquireToken(addr); !ok {
 		r := new(dns.Msg)
@@ -84,7 +84,7 @@ func (l *Limiter) Exec(ctx context.Context, qCtx *query_context.Context, next ex
 		qCtx.SetResponse(r)
 		return nil
 	}
-	return executable_seq.ExecChainNode(ctx, qCtx, next)
+	return executable_seq.ExecChain(ctx, qCtx, next)
 }
 
 func (l *Limiter) Close() error {
@@ -108,6 +108,6 @@ func (l *Limiter) cleanerLoop() {
 }
 
 // Init is a handler.NewPluginFunc.
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return NewLimiter(bp, args.(*Args))
 }

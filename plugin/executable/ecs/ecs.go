@@ -36,7 +36,7 @@ import (
 const PluginType = "ecs"
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 
 	coremain.RegNewPresetPluginFunc("_no_ecs", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &noECS{BP: bp}, nil
@@ -81,7 +81,7 @@ type ecsPlugin struct {
 	ipv4, ipv6 netip.Addr
 }
 
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return newPlugin(bp, args.(*Args))
 }
 
@@ -120,9 +120,9 @@ func newPlugin(bp *coremain.BP, args *Args) (p *ecsPlugin, err error) {
 }
 
 // Exec tries to append ECS to qCtx.Q().
-func (e *ecsPlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (e *ecsPlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	upgraded, newECS := e.addECS(qCtx)
-	err := executable_seq.ExecChainNode(ctx, qCtx, next)
+	err := executable_seq.ExecChain(ctx, qCtx, next)
 	if err != nil {
 		return err
 	}
@@ -207,9 +207,9 @@ type noECS struct {
 
 var _ coremain.ExecutablePlugin = (*noECS)(nil)
 
-func (n *noECS) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (n *noECS) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	dnsutils.RemoveECS(qCtx.Q())
-	if err := executable_seq.ExecChainNode(ctx, qCtx, next); err != nil {
+	if err := executable_seq.ExecChain(ctx, qCtx, next); err != nil {
 		return err
 	}
 	if qCtx.R() != nil {

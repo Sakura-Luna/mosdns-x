@@ -31,11 +31,11 @@ import (
 )
 
 // NewPluginArgsFunc represents a func that creates a new args object.
-type NewPluginArgsFunc func() interface{}
+type NewPluginArgsFunc func() any
 
 // NewPluginFunc represents a func that can init a Plugin.
 // args is the object created by NewPluginArgsFunc.
-type NewPluginFunc func(bp *BP, args interface{}) (p Plugin, err error)
+type NewPluginFunc func(bp *BP, args any) (p Plugin, err error)
 
 type PluginTypeInfo struct {
 	NewPlugin NewPluginFunc
@@ -97,7 +97,7 @@ func NewPlugin(c *PluginConfig, lg *zap.Logger, m *Mosdns) (p Plugin, err error)
 	// parse args
 	if typeInfo.NewArgs != nil {
 		args := typeInfo.NewArgs()
-		if m, ok := c.Args.(map[string]interface{}); ok {
+		if m, ok := c.Args.(map[string]any); ok {
 			if err = utils.WeakDecode(m, args); err != nil {
 				return nil, fmt.Errorf("unable to decode plugin args: %w", err)
 			}

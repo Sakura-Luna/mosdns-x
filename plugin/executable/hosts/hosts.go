@@ -34,7 +34,7 @@ import (
 const PluginType = "hosts"
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 }
 
 var _ coremain.ExecutablePlugin = (*hostsPlugin)(nil)
@@ -49,7 +49,7 @@ type hostsPlugin struct {
 	matcherCloser io.Closer
 }
 
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return newHostsContainer(bp, args.(*Args))
 }
 
@@ -80,14 +80,14 @@ func newHostsContainer(bp *coremain.BP, args *Args) (*hostsPlugin, error) {
 	}, nil
 }
 
-func (h *hostsPlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (h *hostsPlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	r := h.h.LookupMsg(qCtx.Q())
 	if r != nil {
 		qCtx.SetResponse(r)
 		return nil
 	}
 
-	return executable_seq.ExecChainNode(ctx, qCtx, next)
+	return executable_seq.ExecChain(ctx, qCtx, next)
 }
 
 func (h *hostsPlugin) Close() error {

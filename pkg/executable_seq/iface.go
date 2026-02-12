@@ -27,11 +27,11 @@ import (
 
 // Executable represents something that is executable.
 type Executable interface {
-	Exec(ctx context.Context, qCtx *query_context.Context, next ExecutableChainNode) error
+	Exec(ctx context.Context, qCtx *query_context.Context, next ExecChainNode) error
 }
 
-// ExecutableChainNode represents a node in a executable chain.
-type ExecutableChainNode interface {
+// ExecChainNode represents a node in a executable chain.
+type ExecChainNode interface {
 	Executable
 	LinkedListNode
 }
@@ -41,34 +41,34 @@ type Matcher interface {
 	Match(ctx context.Context, qCtx *query_context.Context) (matched bool, err error)
 }
 
-// ExecutableNodeWrapper wraps a Executable to a ExecutableChainNode.
+// ExecutableNodeWrapper wraps a Executable to a ExecChainNode.
 type ExecutableNodeWrapper struct {
 	Executable
 	NodeLinker
 }
 
-// WrapExecutable wraps a Executable to a ExecutableChainNode.
-func WrapExecutable(e Executable) ExecutableChainNode {
-	if ecn, ok := e.(ExecutableChainNode); ok {
+// WrapExecutable wraps a Executable to a ExecChainNode.
+func WrapExecutable(e Executable) ExecChainNode {
+	if ecn, ok := e.(ExecChainNode); ok {
 		return ecn
 	}
 	return &ExecutableNodeWrapper{Executable: e}
 }
 
 type LinkedListNode interface {
-	Next() ExecutableChainNode
-	LinkNext(n ExecutableChainNode)
+	Next() ExecChainNode
+	LinkNext(n ExecChainNode)
 }
 
 // NodeLinker implements LinkedListNode.
 type NodeLinker struct {
-	next ExecutableChainNode
+	next ExecChainNode
 }
 
-func (l *NodeLinker) Next() ExecutableChainNode {
+func (l *NodeLinker) Next() ExecChainNode {
 	return l.next
 }
 
-func (l *NodeLinker) LinkNext(n ExecutableChainNode) {
+func (l *NodeLinker) LinkNext(n ExecChainNode) {
 	l.next = n
 }

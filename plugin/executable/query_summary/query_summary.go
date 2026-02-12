@@ -37,7 +37,7 @@ const (
 )
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(*Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(*Args) })
 	coremain.RegNewPresetPluginFunc("_query_summary", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newLogger(bp, &Args{Source: true}), nil
 	})
@@ -76,7 +76,7 @@ type logger struct {
 }
 
 // Init is a handler.NewPluginFunc.
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return newLogger(bp, args.(*Args)), nil
 }
 
@@ -85,8 +85,8 @@ func newLogger(bp *coremain.BP, args *Args) coremain.Plugin {
 	return &logger{BP: bp, args: args}
 }
 
-func (l *logger) Exec(ctx context.Context, qCtx *C.Context, next executable_seq.ExecutableChainNode) error {
-	err := executable_seq.ExecChainNode(ctx, qCtx, next)
+func (l *logger) Exec(ctx context.Context, qCtx *C.Context, next executable_seq.ExecChainNode) error {
+	err := executable_seq.ExecChain(ctx, qCtx, next)
 	if err == nil {
 		err = qCtx.Status()
 	}

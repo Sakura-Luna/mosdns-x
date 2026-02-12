@@ -32,7 +32,7 @@ import (
 )
 
 type ParallelNode struct {
-	s       []ExecutableChainNode
+	s       []ExecChainNode
 	timeout time.Duration
 
 	logger *zap.Logger // not nil
@@ -43,14 +43,14 @@ const (
 )
 
 type ParallelConfig struct {
-	Parallel []interface{} `yaml:"parallel"`
+	Parallel []any `yaml:"parallel"`
 }
 
 func ParseParallelNode(c *ParallelConfig, logger *zap.Logger, execs map[string]Executable, matchers map[string]Matcher) (*ParallelNode, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
-	ps := make([]ExecutableChainNode, 0, len(c.Parallel))
+	ps := make([]ExecChainNode, 0, len(c.Parallel))
 	for i, subSequence := range c.Parallel {
 		es, err := BuildExecutableLogicTree(subSequence, logger.Named("parallel_seq_"+strconv.Itoa(i)), execs, matchers)
 		if err != nil {
@@ -71,9 +71,9 @@ type parallelECSResult struct {
 	from int
 }
 
-func (p *ParallelNode) Exec(ctx context.Context, qCtx *query_context.Context, next ExecutableChainNode) error {
+func (p *ParallelNode) Exec(ctx context.Context, qCtx *query_context.Context, next ExecChainNode) error {
 	qCtx.SetStatus(p.exec(ctx, qCtx))
-	return ExecChainNode(ctx, qCtx, next)
+	return ExecChain(ctx, qCtx, next)
 }
 
 func (p *ParallelNode) exec(ctx context.Context, qCtx *query_context.Context) error {
@@ -87,9 +87,6 @@ func (p *ParallelNode) exec(ctx context.Context, qCtx *query_context.Context) er
 	var taskCtx context.Context
 	var cancel context.CancelFunc
 
-	if p.timeout > 0 {
-		p.logger.Sugar().Warn("executing parallel command with timeout %v", p.timeout)
-	}
 	timeout := time.Now().Add(parallelTimeout)
 	if ddl, ok := ctx.Deadline(); !ok || ddl.After(timeout) {
 		taskCtx, cancel = context.WithDeadline(ctx, timeout)
@@ -108,7 +105,7 @@ func (p *ParallelNode) exec(ctx context.Context, qCtx *query_context.Context) er
 			pCtx, pCancel := context.WithCancel(taskCtx)
 			defer pCancel()
 
-			err := ExecChainNode(pCtx, qCtxCopy, node)
+			err := ExecChain(pCtx, qCtxCopy, node)
 			select {
 			case c <- &parallelECSResult{qCtx: qCtxCopy, err: err, from: i}:
 			case <-pCtx.Done():

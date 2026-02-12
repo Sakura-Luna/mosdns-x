@@ -45,7 +45,7 @@ const (
 )
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 }
 
 var _ coremain.ExecutablePlugin = (*reverseLookup)(nil)
@@ -73,7 +73,7 @@ type reverseLookup struct {
 	c    cache.Backend
 }
 
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return newReverseLookup(bp, args.(*Args))
 }
 
@@ -106,14 +106,14 @@ func newReverseLookup(bp *coremain.BP, args *Args) (coremain.Plugin, error) {
 	return p, nil
 }
 
-func (p *reverseLookup) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (p *reverseLookup) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	q := qCtx.Q()
 	if r := p.handlePTRQuery(q); r != nil {
 		qCtx.SetResponse(r)
 		return nil
 	}
 
-	if err := executable_seq.ExecChainNode(ctx, qCtx, next); err != nil {
+	if err := executable_seq.ExecChain(ctx, qCtx, next); err != nil {
 		return err
 	}
 	p.saveIPs(q, qCtx.R())

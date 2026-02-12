@@ -30,7 +30,7 @@ import (
 const PluginType = "marker"
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 }
 
 var (
@@ -50,12 +50,12 @@ func (s *markerPlugin) Match(_ context.Context, qCtx *query_context.Context) (ma
 type Args struct{}
 
 // Exec implements handler.Executable.
-func (s *markerPlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (s *markerPlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	qCtx.AddMark(s.markId)
-	return executable_seq.ExecChainNode(ctx, qCtx, next)
+	return executable_seq.ExecChain(ctx, qCtx, next)
 }
 
-func Init(bp *coremain.BP, _ interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, _ any) (p coremain.Plugin, err error) {
 	markId, err := query_context.AllocateMark()
 	if err != nil {
 		return nil, err

@@ -32,7 +32,7 @@ import (
 const PluginType = "sequence"
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 	coremain.RegNewPresetPluginFunc("_return", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &_return{BP: bp}, nil
 	})
@@ -41,14 +41,14 @@ func init() {
 type sequence struct {
 	*coremain.BP
 
-	ecs executable_seq.ExecutableChainNode
+	ecs executable_seq.ExecChainNode
 }
 
 type Args struct {
-	Exec interface{} `yaml:"exec"`
+	Exec any `yaml:"exec"`
 }
 
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return newSequencePlugin(bp, args.(*Args))
 }
 
@@ -66,12 +66,12 @@ func newSequencePlugin(bp *coremain.BP, args *Args) (*sequence, error) {
 	}, nil
 }
 
-func (s *sequence) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
-	if err := executable_seq.ExecChainNode(ctx, qCtx, s.ecs); err != nil {
+func (s *sequence) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
+	if err := executable_seq.ExecChain(ctx, qCtx, s.ecs); err != nil {
 		return err
 	}
 
-	return executable_seq.ExecChainNode(ctx, qCtx, next)
+	return executable_seq.ExecChain(ctx, qCtx, next)
 }
 
 var _ coremain.ExecutablePlugin = (*_return)(nil)
@@ -80,6 +80,6 @@ type _return struct {
 	*coremain.BP
 }
 
-func (n *_return) Exec(_ context.Context, _ *query_context.Context, _ executable_seq.ExecutableChainNode) error {
+func (n *_return) Exec(_ context.Context, _ *query_context.Context, _ executable_seq.ExecChainNode) error {
 	return nil
 }

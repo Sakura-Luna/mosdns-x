@@ -184,7 +184,7 @@ exec:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := make(map[string]interface{}, 0)
+			args := make(map[string]any, 0)
 			err := yaml.Unmarshal([]byte(tt.yamlStr), args)
 			if err != nil {
 				t.Fatal(err)
@@ -196,7 +196,7 @@ exec:
 			}
 
 			qCtx := query_context.NewContext(new(dns.Msg), nil)
-			err = ExecChainNode(context.Background(), qCtx, ecs)
+			err = ExecChain(context.Background(), qCtx, ecs)
 			if (err != nil || tt.wantErr != nil) && !errors.Is(err, tt.wantErr) {
 				t.Errorf("Exec() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -279,7 +279,7 @@ exec:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := make(map[string]interface{}, 0)
+			args := make(map[string]any, 0)
 			err := yaml.Unmarshal([]byte(tt.yamlStr), args)
 			if err != nil {
 				t.Fatal(err)
@@ -293,7 +293,7 @@ exec:
 			for r := 0; r < 3; r++ {
 				for _, want := range tt.want {
 					qCtx := query_context.NewContext(new(dns.Msg), nil)
-					_ = ExecChainNode(context.Background(), qCtx, ecs)
+					_ = ExecChain(context.Background(), qCtx, ecs)
 					err = qCtx.Status()
 					if (err != nil || want.err != nil) && !errors.Is(err, want.err) {
 						t.Errorf("Exec() error = %v, wantErr %v", err, want.err)

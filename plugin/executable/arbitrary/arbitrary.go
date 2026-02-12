@@ -33,7 +33,7 @@ import (
 const PluginType = "arbitrary"
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 }
 
 type Args struct {
@@ -47,15 +47,15 @@ type arbitraryPlugin struct {
 	m *zone_file.Matcher
 }
 
-func (p *arbitraryPlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (p *arbitraryPlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	if r := p.m.Reply(qCtx.Q()); r != nil {
 		qCtx.SetResponse(r)
 		return nil
 	}
-	return executable_seq.ExecChainNode(ctx, qCtx, next)
+	return executable_seq.ExecChain(ctx, qCtx, next)
 }
 
-func Init(bp *coremain.BP, v interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, v any) (p coremain.Plugin, err error) {
 	args := v.(*Args)
 	m := new(zone_file.Matcher)
 

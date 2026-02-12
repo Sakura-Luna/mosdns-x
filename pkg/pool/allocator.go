@@ -70,7 +70,7 @@ func NewAllocator(maxPoolBitsLen int) *Allocator {
 		} else {
 			bufSize = 1 << i
 		}
-		alloc.buffers[i].New = func() interface{} {
+		alloc.buffers[i].New = func() any {
 			return newBuffer(alloc, make([]byte, bufSize))
 		}
 	}

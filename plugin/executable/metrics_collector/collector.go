@@ -33,7 +33,7 @@ import (
 const PluginType = "metrics_collector"
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 }
 
 type Args struct{}
@@ -74,13 +74,13 @@ func NewCollector(bp *coremain.BP, args *Args) *Collector {
 	return c
 }
 
-func (c *Collector) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (c *Collector) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	c.thread.Inc()
 	defer c.thread.Dec()
 
 	c.queryTotal.Inc()
 	start := time.Now()
-	err := executable_seq.ExecChainNode(ctx, qCtx, next)
+	err := executable_seq.ExecChain(ctx, qCtx, next)
 	if err != nil {
 		c.errTotal.Inc()
 	}
@@ -90,6 +90,6 @@ func (c *Collector) Exec(ctx context.Context, qCtx *query_context.Context, next 
 	return err
 }
 
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return NewCollector(bp, args.(*Args)), nil
 }

@@ -35,8 +35,8 @@ type ConditionNodeConfig struct {
 	If string `yaml:"if"`
 
 	// See BuildExecutableLogicTree.
-	Exec     interface{} `yaml:"exec"`
-	ElseExec interface{} `yaml:"else_exec"`
+	Exec     any `yaml:"exec"`
+	ElseExec any `yaml:"else_exec"`
 }
 
 // ConditionNode implement handler.ExecutableChainNode.
@@ -44,17 +44,17 @@ type ConditionNodeConfig struct {
 // LinkPrevious and LinkNext.
 type ConditionNode struct {
 	ConditionMatcher   Matcher // if ConditionMatcher is nil, ConditionNode is a no-op.
-	ExecutableNode     ExecutableChainNode
-	ElseExecutableNode ExecutableChainNode
+	ExecutableNode     ExecChainNode
+	ElseExecutableNode ExecChainNode
 
-	next ExecutableChainNode
+	next ExecChainNode
 }
 
-func (b *ConditionNode) Next() ExecutableChainNode {
+func (b *ConditionNode) Next() ExecChainNode {
 	return b.next
 }
 
-func (b *ConditionNode) LinkNext(n ExecutableChainNode) {
+func (b *ConditionNode) LinkNext(n ExecChainNode) {
 	b.next = n
 	if b.ExecutableNode != nil {
 		LastNode(b.ExecutableNode).LinkNext(n)
@@ -167,7 +167,7 @@ func newExprParamsPlaceHolder() *exprParamsPlaceHolder {
 	}
 }
 
-func (e *exprParamsPlaceHolder) Get(name string) (interface{}, error) {
+func (e *exprParamsPlaceHolder) Get(name string) (any, error) {
 	f, ok := e.f[name]
 	if !ok {
 		return nil, fmt.Errorf("cannot find var %s", name)
@@ -225,18 +225,18 @@ func (m *conditionMatcher) Match(ctx context.Context, qCtx *query_context.Contex
 	return res, nil
 }
 
-func (b *ConditionNode) Exec(ctx context.Context, qCtx *query_context.Context, next ExecutableChainNode) (err error) {
+func (b *ConditionNode) Exec(ctx context.Context, qCtx *query_context.Context, next ExecChainNode) (err error) {
 	if b.ConditionMatcher != nil {
 		ok, err := b.ConditionMatcher.Match(ctx, qCtx)
 		if err != nil {
 			return fmt.Errorf("matcher failed: %w", err)
 		}
 		if ok && b.ExecutableNode != nil {
-			return ExecChainNode(ctx, qCtx, b.ExecutableNode)
+			return ExecChain(ctx, qCtx, b.ExecutableNode)
 		} else if !ok && b.ElseExecutableNode != nil {
-			return ExecChainNode(ctx, qCtx, b.ElseExecutableNode)
+			return ExecChain(ctx, qCtx, b.ElseExecutableNode)
 		}
 	}
 
-	return ExecChainNode(ctx, qCtx, next)
+	return ExecChain(ctx, qCtx, next)
 }

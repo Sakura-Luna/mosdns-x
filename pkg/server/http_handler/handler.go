@@ -156,8 +156,8 @@ func (h *Handler) ServeHTTP(w ResponseWriter, req Request) {
 		}
 		var matched bool
 		for _, v := range strings.Split(accept, ",") {
-			mediatype := strings.TrimSpace(strings.SplitN(v, ";", 2)[0])
-			if mediatype == "application/dns-message" {
+			mediaType := strings.TrimSpace(strings.SplitN(v, ";", 2)[0])
+			if mediaType == "application/dns-message" {
 				matched = true
 				break
 			}
@@ -273,11 +273,11 @@ func getRemoteAddr(req Request, customHeader string) (netip.Addr, error) {
 			}
 		}
 	}
-	addrport, err := netip.ParseAddrPort(req.GetRemoteAddr())
+	addrPort, err := netip.ParseAddrPort(req.GetRemoteAddr())
 	if err != nil {
 		return netip.Addr{}, err
 	}
-	return addrport.Addr(), nil
+	return addrPort.Addr(), nil
 }
 
 func contain[T any](arr []T, it T) bool {

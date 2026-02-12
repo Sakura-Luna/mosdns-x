@@ -49,40 +49,38 @@ func (d *SocksDialer) DialContext(ctx context.Context, network, addr string) (ne
 	}
 	conn, err := d.dialer.DialContext(ctx, "tcp", d.addr.String())
 	if err != nil {
-		return nil, fmt.Errorf("dial faile: %v", err)
+		return nil, fmt.Errorf("dial failed: %v", err)
 	}
 	methods := []byte{MethodNoAuth}
 	if d.username != "" || d.password != "" {
 		methods = append(methods, MethodUserPass)
 	}
+	fail := func(err error) (net.Conn, error) {
+		conn.Close()
+		return nil, err
+	}
 	negoReq := slices.Concat([]byte{Version5, byte(len(methods))}, methods)
 	_, err = conn.Write(negoReq)
 	if err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("send negotiation request failed: %v", err)
+		return fail(fmt.Errorf("send negotiation request failed: %v", err))
 	}
 	negoRes := make([]byte, 2)
 	n, err := conn.Read(negoRes)
 	if err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("receive negotiation response failed: %v", err)
+		return fail(fmt.Errorf("receive negotiation response failed: %v", err))
 	}
 	if n < 2 {
-		conn.Close()
-		return nil, fmt.Errorf("negotiation response too short")
+		return fail(fmt.Errorf("negotiation response too short"))
 	}
 	if negoRes[0] != Version5 {
-		conn.Close()
-		return nil, fmt.Errorf("unsupported negotiation response version: %v", negoRes[0])
+		return fail(fmt.Errorf("unsupported negotiation response version: %v", negoRes[0]))
 	}
 	if negoRes[1] == NoAcceptableMethods {
-		conn.Close()
-		return nil, fmt.Errorf("negotiation failed: no acceptable methods")
+		return fail(fmt.Errorf("negotiation failed: no acceptable methods"))
 	}
 	if d.username == "" && d.password == "" {
 		if negoRes[1] != MethodNoAuth {
-			conn.Close()
-			return nil, fmt.Errorf("invalid negotiation method: %v", handleNegotiationMethod(negoRes[1]))
+			return fail(fmt.Errorf("invalid negotiation method: %v", handleNegotiationMethod(negoRes[1])))
 		}
 	} else if negoRes[1] == MethodUserPass {
 		user := []byte(d.username)
@@ -90,30 +88,24 @@ func (d *SocksDialer) DialContext(ctx context.Context, network, addr string) (ne
 		authReq := slices.Concat([]byte{Version1, byte(len(user))}, user, []byte{byte(len(pass))}, pass)
 		_, err = conn.Write(authReq)
 		if err != nil {
-			conn.Close()
-			return nil, fmt.Errorf("send username password authentication request failed: %v", err)
+			return fail(fmt.Errorf("send username password authentication request failed: %v", err))
 		}
 		authRes := make([]byte, 2)
 		n, err = conn.Read(authRes)
 		if err != nil {
-			conn.Close()
-			return nil, fmt.Errorf("receive username password authentication response failed: %v", err)
+			return fail(fmt.Errorf("receive username password authentication response failed: %v", err))
 		}
 		if n < 2 {
-			conn.Close()
-			return nil, fmt.Errorf("username password authentication response too short")
+			return fail(fmt.Errorf("username password authentication response too short"))
 		}
 		if authRes[0] != Version1 {
-			conn.Close()
-			return nil, fmt.Errorf("unsupported username password authentication response version: %v", authRes[0])
+			return fail(fmt.Errorf("unsupported username password authentication response version: %v", authRes[0]))
 		}
 		if authRes[1] != AuthSucceeded {
-			conn.Close()
-			return nil, fmt.Errorf("username password authentication faild: status %v", authRes[1])
+			return fail(fmt.Errorf("username password authentication failed: status %v", authRes[1]))
 		}
 	} else if negoRes[1] != MethodNoAuth {
-		conn.Close()
-		return nil, fmt.Errorf("invalid negotiation method: %v", handleNegotiationMethod(negoRes[1]))
+		return fail(fmt.Errorf("invalid negotiation method: %v", handleNegotiationMethod(negoRes[1])))
 	}
 	var reqType string
 	var cmd byte
@@ -126,36 +118,29 @@ func (d *SocksDialer) DialContext(ctx context.Context, network, addr string) (ne
 	}
 	sAddr, err := ParseSocksAddr(addr)
 	if err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("parse socks addr failed: %v", err)
+		return fail(fmt.Errorf("parse socks addr failed: %v", err))
 	}
 	dialReq := slices.Concat([]byte{Version5, cmd, Reversed}, sAddr.Slice())
 	_, err = conn.Write(dialReq)
 	if err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("send %s request failed: %v", reqType, err)
+		return fail(fmt.Errorf("send %s request failed: %v", reqType, err))
 	}
 	dialRes := make([]byte, 4)
 	n, err = conn.Read(dialRes)
 	if err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("receive %s response failed: %v", reqType, err)
+		return fail(fmt.Errorf("receive %s response failed: %v", reqType, err))
 	}
 	if n < 4 {
-		conn.Close()
-		return nil, fmt.Errorf("%s response too short", reqType)
+		return fail(fmt.Errorf("%s response too short", reqType))
 	}
 	if dialRes[0] != Version5 {
-		conn.Close()
-		return nil, fmt.Errorf("unsupported %s response version: %v", reqType, negoReq[0])
+		return fail(fmt.Errorf("unsupported %s response version: %v", reqType, negoReq[0]))
 	}
 	if dialRes[1] != DialSucceeded {
-		conn.Close()
-		return nil, fmt.Errorf("%s failed: %s", reqType, handleDialStatus(dialRes[1]))
+		return fail(fmt.Errorf("%s failed: %s", reqType, handleDialStatus(dialRes[1])))
 	}
 	if dialRes[2] != Reversed {
-		conn.Close()
-		return nil, fmt.Errorf("invalid %s response reserved byte: %v", reqType, dialRes[2])
+		return fail(fmt.Errorf("invalid %s response reserved byte: %v", reqType, dialRes[2]))
 	}
 	var bindAddr SocksAddr
 	switch dialRes[3] {
@@ -163,71 +148,58 @@ func (d *SocksDialer) DialContext(ctx context.Context, network, addr string) (ne
 		addr := make([]byte, 4)
 		n, err = conn.Read(addr)
 		if err != nil {
-			conn.Close()
-			return nil, fmt.Errorf("parse ipv4 bind address failed: %v", err)
+			return fail(fmt.Errorf("parse ipv4 bind address failed: %v", err))
 		}
 		if n < 4 {
-			conn.Close()
-			return nil, fmt.Errorf("parse ipv4 bind address failed: bind address too short")
+			return fail(fmt.Errorf("parse ipv4 bind address failed: bind address too short"))
 		}
 		if addr, ok := netip.AddrFromSlice(addr); ok {
 			bindAddr.SetAddr(addr)
 		} else {
-			conn.Close()
-			return nil, fmt.Errorf("parse ipv4 bind address failed: invalid ipv4 address")
+			return fail(fmt.Errorf("parse ipv4 bind address failed: invalid ipv4 address"))
 		}
 	case TypeFqdn:
 		addrLen := make([]byte, 1)
 		n, err = conn.Read(addrLen)
 		if err != nil {
-			conn.Close()
-			return nil, fmt.Errorf("parse fqdn bind address length failed: %v", err)
+			return fail(fmt.Errorf("parse fqdn bind address length failed: %v", err))
 		}
 		if n == 0 {
-			conn.Close()
-			return nil, fmt.Errorf("parse fqdn bind address failed: length is zero")
+			return fail(fmt.Errorf("parse fqdn bind address failed: length is zero"))
 		}
 		addr := make([]byte, addrLen[0])
 		n, err = conn.Read(addr)
 		if err != nil {
-			conn.Close()
-			return nil, fmt.Errorf("parse fqdn bind address failed: %v", err)
+			return fail(fmt.Errorf("parse fqdn bind address failed: %v", err))
 		}
 		if n < int(addrLen[0]) {
-			conn.Close()
-			return nil, fmt.Errorf("parse fqdn bind address failed: bind address too short")
+			return fail(fmt.Errorf("parse fqdn bind address failed: bind address too short"))
 		}
 		bindAddr.SetFqdn(string(addr))
 	case TypeIPv6:
 		addr := make([]byte, 16)
 		n, err = conn.Read(addr)
 		if err != nil {
-			conn.Close()
-			return nil, fmt.Errorf("parse ipv6 bind address failed: %v", err)
+			return fail(fmt.Errorf("parse ipv6 bind address failed: %v", err))
 		}
 		if n < 16 {
-			conn.Close()
-			return nil, fmt.Errorf("parse ipv6 bind address failed: bind address too short")
+			return fail(fmt.Errorf("parse ipv6 bind address failed: bind address too short"))
 		}
 		if addr, ok := netip.AddrFromSlice(addr); ok {
 			bindAddr.SetAddr(addr)
 		} else {
-			conn.Close()
-			return nil, fmt.Errorf("parse ipv6 bind address failed: invalid ipv6 address")
+			return fail(fmt.Errorf("parse ipv6 bind address failed: invalid ipv6 address"))
 		}
 	default:
-		conn.Close()
-		return nil, fmt.Errorf("unsupported bind address type: %v", dialRes[3])
+		return fail(fmt.Errorf("unsupported bind address type: %v", dialRes[3]))
 	}
 	rawPort := make([]byte, 2)
 	n, err = conn.Read(rawPort)
 	if err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("parse bind port failed: %v", err)
+		return fail(fmt.Errorf("parse bind port failed: %v", err))
 	}
 	if n < 2 {
-		conn.Close()
-		return nil, fmt.Errorf("parse bind port failed: bind port too short")
+		return fail(fmt.Errorf("parse bind port failed: bind port too short"))
 	}
 	bindAddr.SetPort(binary.BigEndian.Uint16(rawPort))
 	if network == "tcp" {
@@ -235,18 +207,15 @@ func (d *SocksDialer) DialContext(ctx context.Context, network, addr string) (ne
 	}
 	c, err := d.dialer.DialContext(context.Background(), "udp", bindAddr.String())
 	if err != nil {
-		conn.Close()
-		return nil, err
+		return fail(err)
 	}
 	pc, isPC := c.(net.PacketConn)
 	if !isPC {
-		conn.Close()
-		return nil, fmt.Errorf("not a packet conn")
+		return fail(fmt.Errorf("not a packet conn"))
 	}
 	uc, isUC := pc.(*net.UDPConn)
 	if !isUC {
-		conn.Close()
-		return nil, fmt.Errorf("not a udp conn")
+		return fail(fmt.Errorf("not a udp conn"))
 	}
 	spc := &SocksPacketConn{
 		conn:  conn,

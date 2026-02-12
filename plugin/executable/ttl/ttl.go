@@ -34,7 +34,7 @@ const (
 )
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 }
 
 var _ coremain.ExecutablePlugin = (*ttl)(nil)
@@ -49,7 +49,7 @@ type ttl struct {
 	args *Args
 }
 
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return newTTL(bp, args.(*Args))
 }
 
@@ -60,12 +60,12 @@ func newTTL(bp *coremain.BP, args *Args) (coremain.Plugin, error) {
 	return &ttl{BP: bp, args: args}, nil
 }
 
-func (t *ttl) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (t *ttl) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	if r := qCtx.R(); r != nil {
 		if len(r.Answer) == 0 && len(r.Ns) == 0 && len(r.Extra) == 0 {
 			r.Ns = append(r.Ns, dnsutils.FakeSOA(r.Question[0].Header().Name))
 		}
 		dnsutils.ApplyTTL(r, t.args.MaximumTTL, t.args.MinimalTTL)
 	}
-	return executable_seq.ExecChainNode(ctx, qCtx, next)
+	return executable_seq.ExecChain(ctx, qCtx, next)
 }

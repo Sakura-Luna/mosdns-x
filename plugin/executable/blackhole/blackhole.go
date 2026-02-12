@@ -37,7 +37,7 @@ import (
 const PluginType = "blackhole"
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 
 	coremain.RegNewPresetPluginFunc("_drop_response", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newBlackHole(bp, &Args{RCode: -1})
@@ -78,7 +78,7 @@ type Args struct {
 	RCode int      `yaml:"rcode"` // block by responding specific RCode
 }
 
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return newBlackHole(bp, args.(*Args))
 }
 
@@ -112,9 +112,9 @@ func newBlackHole(bp *coremain.BP, args *Args) (*blackHole, error) {
 // sets qCtx.R() with empty response with rcode = Args.RCode.
 // drops qCtx.R() if Args.RCode < 0
 // It never returns an error.
-func (b *blackHole) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (b *blackHole) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	b.exec(qCtx)
-	return executable_seq.ExecChainNode(ctx, qCtx, next)
+	return executable_seq.ExecChain(ctx, qCtx, next)
 }
 
 func (b *blackHole) exec(qCtx *query_context.Context) {

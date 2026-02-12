@@ -45,10 +45,10 @@ type rejectAny struct {
 	*coremain.BP
 }
 
-func (p *rejectAny) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (p *rejectAny) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	q := qCtx.Q()
 	if dns.RRToType(q.Question[0]) != dns.TypeANY {
-		return executable_seq.ExecChainNode(ctx, qCtx, next)
+		return executable_seq.ExecChain(ctx, qCtx, next)
 	}
 	r := new(dns.Msg)
 	dnsutil.SetReply(r, q)

@@ -55,8 +55,8 @@ func Test_FallbackECS_fallback(t *testing.T) {
 		{"success 1 failed 2", nil, er, nil, er, nil, true},  // no response
 	}
 	conf := &FallbackConfig{
-		Primary:       []interface{}{"p1"},
-		Secondary:     []interface{}{"p2"},
+		Primary:       []any{"p1"},
+		Secondary:     []any{"p2"},
 		StatLength:    2,
 		Threshold:     3,
 		FastFallback:  0,
@@ -87,7 +87,7 @@ func Test_FallbackECS_fallback(t *testing.T) {
 			p2.Unlock()
 
 			qCtx := query_context.NewContext(new(dns.Msg), nil)
-			_ = ExecChainNode(ctx, qCtx, WrapExecutable(fallbackECS))
+			_ = ExecChain(ctx, qCtx, WrapExecutable(fallbackECS))
 			err = qCtx.Status()
 			if tt.wantErr != (err != nil) {
 				t.Fatalf("execCmd() error = %v, wantErr %v", err, tt.wantErr)
@@ -136,8 +136,8 @@ func Test_FallbackECS_fast_fallback(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			conf := &FallbackConfig{
-				Primary:       []interface{}{"p1"},
-				Secondary:     []interface{}{"p2"},
+				Primary:       []any{"p1"},
+				Secondary:     []any{"p2"},
 				StatLength:    0, // never trigger the normal fallback mode
 				Threshold:     0,
 				FastFallback:  100,
@@ -166,7 +166,7 @@ func Test_FallbackECS_fast_fallback(t *testing.T) {
 
 			start := time.Now()
 			qCtx := query_context.NewContext(new(dns.Msg), nil)
-			err = ExecChainNode(ctx, qCtx, WrapExecutable(fallbackECS))
+			err = ExecChain(ctx, qCtx, WrapExecutable(fallbackECS))
 			if time.Since(start) > time.Millisecond*time.Duration(tt.wantLatency) {
 				t.Fatalf("execCmd() timeout: latency = %vms, want = %vms", time.Since(start).Milliseconds(), tt.wantLatency)
 			}

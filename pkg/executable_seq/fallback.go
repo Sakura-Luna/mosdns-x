@@ -34,9 +34,9 @@ import (
 
 type FallbackConfig struct {
 	// Primary exec sequence.
-	Primary interface{} `yaml:"primary"`
+	Primary any `yaml:"primary"`
 	// Secondary exec sequence.
-	Secondary interface{} `yaml:"secondary"`
+	Secondary any `yaml:"secondary"`
 
 	StatLength int `yaml:"stat_length"` // A Zero value disables the normal fallback.
 	Threshold  int `yaml:"threshold"`
@@ -49,8 +49,8 @@ type FallbackConfig struct {
 }
 
 type FallbackNode struct {
-	primary              ExecutableChainNode
-	secondary            ExecutableChainNode
+	primary              ExecChainNode
+	secondary            ExecChainNode
 	fastFallbackDuration time.Duration
 	alwaysStandby        bool
 
@@ -149,9 +149,9 @@ func ParseFallbackNode(c *FallbackConfig, logger *zap.Logger, execs map[string]E
 	return fallbackECS, nil
 }
 
-func (f *FallbackNode) Exec(ctx context.Context, qCtx *query_context.Context, next ExecutableChainNode) error {
+func (f *FallbackNode) Exec(ctx context.Context, qCtx *query_context.Context, next ExecChainNode) error {
 	qCtx.SetStatus(f.exec(ctx, qCtx))
-	return ExecChainNode(ctx, qCtx, next)
+	return ExecChain(ctx, qCtx, next)
 }
 
 func (f *FallbackNode) exec(ctx context.Context, qCtx *query_context.Context) error {
@@ -172,7 +172,10 @@ func (f *FallbackNode) exec(ctx context.Context, qCtx *query_context.Context) er
 // }
 
 func (f *FallbackNode) doPrimary(ctx context.Context, qCtx *query_context.Context) (err error) {
-	err = ExecChainNode(ctx, qCtx, f.primary)
+	err = ExecChain(ctx, qCtx, f.primary)
+	if err == nil {
+		err = qCtx.Status()
+	}
 	if f.primaryST != nil {
 		if e := qCtx.Status(); qCtx.R() == nil && !errors.Is(e, context.Canceled) {
 			f.primaryST.update(1)
@@ -271,7 +274,7 @@ func (f *FallbackNode) doFastFallback(ctx context.Context, qCtx *query_context.C
 }
 
 func (f *FallbackNode) doSecondary(ctx context.Context, qCtx *query_context.Context) (err error) {
-	return ExecChainNode(ctx, qCtx, f.secondary)
+	return ExecChain(ctx, qCtx, f.secondary)
 }
 
 func (f *FallbackNode) doFallback(ctx context.Context, qCtx *query_context.Context) error {

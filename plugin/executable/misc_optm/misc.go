@@ -51,7 +51,7 @@ type optm struct {
 	*coremain.BP
 }
 
-func (t *optm) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (t *optm) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	q := qCtx.Q()
 
 	// Block query that is unusual.
@@ -68,7 +68,7 @@ func (t *optm) Exec(ctx context.Context, qCtx *query_context.Context, next execu
 		q.UDPSize = maxUDPSize
 	}
 
-	if err := executable_seq.ExecChainNode(ctx, qCtx, next); err != nil {
+	if err := executable_seq.ExecChain(ctx, qCtx, next); err != nil {
 		return err
 	}
 

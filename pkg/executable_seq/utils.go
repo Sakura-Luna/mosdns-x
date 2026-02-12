@@ -68,7 +68,7 @@ func asyncWait(ctx context.Context, qCtx *query_context.Context, logger *zap.Log
 }
 
 // LastNode returns the Latest node of chain of n.
-func LastNode(n ExecutableChainNode) ExecutableChainNode {
+func LastNode(n ExecChainNode) ExecChainNode {
 	p := n
 	for p.Next() != nil {
 		p = p.Next()
@@ -76,7 +76,7 @@ func LastNode(n ExecutableChainNode) ExecutableChainNode {
 	return p
 }
 
-func ExecChainNode(ctx context.Context, qCtx *query_context.Context, n ExecutableChainNode) error {
+func ExecChain(ctx context.Context, qCtx *query_context.Context, n ExecChainNode) error {
 	if n == nil {
 		return nil
 	}
@@ -102,7 +102,7 @@ type DummyExecutable struct {
 	WantErr   error
 }
 
-func (d *DummyExecutable) Exec(ctx context.Context, qCtx *query_context.Context, next ExecutableChainNode) error {
+func (d *DummyExecutable) Exec(ctx context.Context, qCtx *query_context.Context, next ExecChainNode) error {
 	if d.WantSleep != 0 {
 		time.Sleep(d.WantSleep)
 	}
@@ -120,7 +120,7 @@ func (d *DummyExecutable) Exec(ctx context.Context, qCtx *query_context.Context,
 		qCtx.SetResponse(d.WantR)
 	}
 	d.Unlock()
-	return ExecChainNode(ctx, qCtx, next)
+	return ExecChain(ctx, qCtx, next)
 }
 
 func LogicalAndMatcherGroup(ctx context.Context, qCtx *query_context.Context, mg []Matcher) (matched bool, err error) {

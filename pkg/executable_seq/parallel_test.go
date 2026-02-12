@@ -69,7 +69,7 @@ func Test_ParallelNode(t *testing.T) {
 			}
 
 			pc := &ParallelConfig{
-				Parallel: []interface{}{"p1", "p2"},
+				Parallel: []any{"p1", "p2"},
 			}
 
 			parallelNode, err := ParseParallelNode(pc, zap.NewNop(), execs, nil)
@@ -82,7 +82,7 @@ func Test_ParallelNode(t *testing.T) {
 
 			start := time.Now()
 			qCtx := query_context.NewContext(new(dns.Msg), nil)
-			_ = ExecChainNode(ctx, qCtx, WrapExecutable(parallelNode))
+			_ = ExecChain(ctx, qCtx, WrapExecutable(parallelNode))
 			err = qCtx.Status()
 
 			if time.Since(start) > wantLatency {

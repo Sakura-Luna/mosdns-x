@@ -46,7 +46,7 @@ const (
 )
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 
 	coremain.RegNewPresetPluginFunc("_default_cache", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newCachePlugin(bp, &Args{})
@@ -85,7 +85,7 @@ type cachePlugin struct {
 	size         prometheus.GaugeFunc
 }
 
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return newCachePlugin(bp, args.(*Args))
 }
 
@@ -155,7 +155,7 @@ func newCachePlugin(bp *coremain.BP, args *Args) (*cachePlugin, error) {
 	return p, nil
 }
 
-func (c *cachePlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (c *cachePlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	c.queryTotal.Inc()
 	q := qCtx.Q()
 
@@ -164,7 +164,7 @@ func (c *cachePlugin) Exec(ctx context.Context, qCtx *query_context.Context, nex
 		c.L().Error("get msg key", qCtx.InfoField(), zap.Error(err))
 	}
 	if len(msgKey) == 0 { // skip cache
-		return executable_seq.ExecChainNode(ctx, qCtx, next)
+		return executable_seq.ExecChain(ctx, qCtx, next)
 	}
 
 	cachedResp, lazyHit, err := c.lookupCache(msgKey)
@@ -189,7 +189,7 @@ func (c *cachePlugin) Exec(ctx context.Context, qCtx *query_context.Context, nex
 
 	// cache miss, run the entry and try to store its response.
 	c.L().Debug("cache miss", qCtx.InfoField())
-	err = executable_seq.ExecChainNode(ctx, qCtx, next)
+	err = executable_seq.ExecChain(ctx, qCtx, next)
 	r := qCtx.R()
 	if r != nil {
 		if err := c.tryStoreMsg(msgKey, r); err != nil {
@@ -269,15 +269,18 @@ func (c *cachePlugin) lookupCache(msgKey string) (r *dns.Msg, lazyHit bool, err 
 
 // doLazyUpdate starts a new goroutine to execute next node and update the cache in the background.
 // It has an inner singleflight.Group to de-duplicate same msgKey.
-func (c *cachePlugin) doLazyUpdate(msgKey string, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) {
+func (c *cachePlugin) doLazyUpdate(msgKey string, qCtx *query_context.Context, next executable_seq.ExecChainNode) {
 	lazyQCtx := qCtx.Copy()
-	lazyUpdateFunc := func() (interface{}, error) {
+	lazyUpdateFunc := func() (any, error) {
 		c.L().Debug("start lazy cache update", lazyQCtx.InfoField())
 		defer c.lazyUpdateSF.Forget(msgKey)
 		lazyCtx, cancel := context.WithTimeout(context.Background(), lazyUpdateTimeout)
 		defer cancel()
 
-		err := executable_seq.ExecChainNode(lazyCtx, lazyQCtx, next)
+		err := executable_seq.ExecChain(lazyCtx, lazyQCtx, next)
+		if err == nil {
+			err = lazyQCtx.Status()
+		}
 		if err != nil {
 			c.L().Warn("failed to update lazy cache", lazyQCtx.InfoField(), zap.Error(err))
 		}

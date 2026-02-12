@@ -38,7 +38,7 @@ import (
 const PluginType = "query_matcher"
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 
 	coremain.RegNewPresetPluginFunc(
 		"_qtype_A_AAAA",
@@ -84,7 +84,7 @@ func (m *queryMatcher) Match(ctx context.Context, qCtx *query_context.Context) (
 	return executable_seq.LogicalAndMatcherGroup(ctx, qCtx, m.matcherGroup)
 }
 
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return newQueryMatcher(bp, args.(*Args))
 }
 

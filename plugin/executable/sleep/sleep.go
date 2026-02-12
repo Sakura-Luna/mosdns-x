@@ -34,7 +34,7 @@ const PluginType = "sleep"
 func init() {
 	// Register this plugin type with its initialization funcs. So that, this plugin
 	// can be configured by user from configuration file.
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 
 	// You can also register a plugin object directly. (If plugin do not need to configure)
 	// Then you can directly use "_sleep_500ms" in configuration file.
@@ -58,7 +58,7 @@ type sleep struct {
 }
 
 // Exec implements handler.Executable.
-func (s *sleep) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (s *sleep) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	if s.d > 0 {
 		timer := pool.GetTimer(s.d)
 		defer pool.ReleaseTimer(timer)
@@ -70,14 +70,14 @@ func (s *sleep) Exec(ctx context.Context, qCtx *query_context.Context, next exec
 	}
 
 	// Call handler.ExecChainNode() can execute next plugin.
-	return executable_seq.ExecChainNode(ctx, qCtx, next)
+	return executable_seq.ExecChain(ctx, qCtx, next)
 
 	// You can control how/when to execute next plugin.
 	// For more complex example, see plugin "cache".
 }
 
 // Init is a handler.NewPluginFunc.
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	d := args.(*Args).Duration
 	return &sleep{
 		BP: bp,

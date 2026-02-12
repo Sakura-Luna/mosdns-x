@@ -26,7 +26,7 @@ import (
 const PluginType = "ipset"
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 }
 
 type Args struct {
@@ -36,6 +36,6 @@ type Args struct {
 	Mask6    int    `yaml:"mask6"` // default 32
 }
 
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return newIpsetPlugin(bp, args.(*Args))
 }

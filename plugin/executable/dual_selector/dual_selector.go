@@ -44,7 +44,7 @@ const (
 )
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 	coremain.RegNewPresetPluginFunc("_prefer_ipv4", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &Selector{BP: bp, mode: modePreferIPv4}, nil
 	})
@@ -74,16 +74,16 @@ func (s *Selector) getWaitTimeout() time.Duration {
 }
 
 // Exec implements handler.Executable.
-func (s *Selector) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (s *Selector) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	q := qCtx.Q()
 	if len(q.Question) != 1 { // skip wired query with multiple questions.
-		return executable_seq.ExecChainNode(ctx, qCtx, next)
+		return executable_seq.ExecChain(ctx, qCtx, next)
 	}
 
 	qtype := dns.RRToType(q.Question[0])
 	// skip queries that have preferred type or have other unrelated qtypes.
 	if (qtype == dns.TypeA && s.mode == modePreferIPv4) || (qtype == dns.TypeAAAA && s.mode == modePreferIPv6) || (qtype != dns.TypeA && qtype != dns.TypeAAAA) {
-		return executable_seq.ExecChainNode(ctx, qCtx, next)
+		return executable_seq.ExecChain(ctx, qCtx, next)
 	}
 
 	// start reference goroutine
@@ -108,7 +108,7 @@ func (s *Selector) Exec(ctx context.Context, qCtx *query_context.Context, next e
 	ctxRef, cancelRef := context.WithDeadline(context.Background(), ddl)
 	go func() {
 		defer cancelRef()
-		err := executable_seq.ExecChainNode(ctxRef, qCtxRef, next)
+		err := executable_seq.ExecChain(ctxRef, qCtxRef, next)
 		if err != nil {
 			s.L().Warn("reference query routine err", qCtxRef.InfoField(), zap.Error(err))
 			close(shouldPass)
@@ -129,7 +129,7 @@ func (s *Selector) Exec(ctx context.Context, qCtx *query_context.Context, next e
 	ctxSub, cancelSub := context.WithDeadline(context.Background(), ddl)
 	defer cancelSub()
 	go func() {
-		doneChan <- executable_seq.ExecChainNode(ctxSub, qCtxSub, next)
+		doneChan <- executable_seq.ExecChain(ctxSub, qCtxSub, next)
 	}()
 
 	select {
@@ -161,7 +161,7 @@ func (s *Selector) Exec(ctx context.Context, qCtx *query_context.Context, next e
 	}
 }
 
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return NewDualSelector(bp, args.(*Args)), nil
 }
 

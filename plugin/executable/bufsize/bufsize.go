@@ -30,7 +30,7 @@ import (
 const PluginType = "bufsize"
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 }
 
 type Args struct {
@@ -54,7 +54,7 @@ func (b *bufSize) getSize() uint16 {
 	return b.size
 }
 
-func (b *bufSize) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (b *bufSize) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	q := qCtx.Q()
 	if q.IsEdns0() {
 		maxSize := b.getSize()
@@ -63,10 +63,10 @@ func (b *bufSize) Exec(ctx context.Context, qCtx *query_context.Context, next ex
 		}
 	}
 
-	return executable_seq.ExecChainNode(ctx, qCtx, next)
+	return executable_seq.ExecChain(ctx, qCtx, next)
 }
 
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return &bufSize{
 		BP:   bp,
 		size: args.(*Args).Size,

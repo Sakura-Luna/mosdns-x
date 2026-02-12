@@ -31,16 +31,16 @@ import (
 )
 
 type LBNode struct {
-	prev, next ExecutableChainNode
-	branchNode []ExecutableChainNode
+	prev, next ExecChainNode
+	branchNode []ExecChainNode
 	p          uint32
 }
 
-func (lbn *LBNode) Next() ExecutableChainNode {
+func (lbn *LBNode) Next() ExecChainNode {
 	return lbn.next
 }
 
-func (lbn *LBNode) LinkNext(n ExecutableChainNode) {
+func (lbn *LBNode) LinkNext(n ExecChainNode) {
 	lbn.next = n
 	for _, branch := range lbn.branchNode {
 		LastNode(branch).LinkNext(n)
@@ -48,14 +48,14 @@ func (lbn *LBNode) LinkNext(n ExecutableChainNode) {
 }
 
 type LBConfig struct {
-	LoadBalance []interface{} `yaml:"load_balance"`
+	LoadBalance []any `yaml:"load_balance"`
 }
 
 func ParseLBNode(c *LBConfig, logger *zap.Logger, execs map[string]Executable, matchers map[string]Matcher) (*LBNode, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
-	ps := make([]ExecutableChainNode, 0, len(c.LoadBalance))
+	ps := make([]ExecChainNode, 0, len(c.LoadBalance))
 	for i, subSequence := range c.LoadBalance {
 		es, err := BuildExecutableLogicTree(subSequence, logger.Named("lb_seq_"+strconv.Itoa(i)), execs, matchers)
 		if err != nil {
@@ -67,12 +67,12 @@ func ParseLBNode(c *LBConfig, logger *zap.Logger, execs map[string]Executable, m
 	return &LBNode{branchNode: ps}, nil
 }
 
-func (lbn *LBNode) Exec(ctx context.Context, qCtx *query_context.Context, next ExecutableChainNode) error {
+func (lbn *LBNode) Exec(ctx context.Context, qCtx *query_context.Context, next ExecChainNode) error {
 	if len(lbn.branchNode) == 0 {
-		return ExecChainNode(ctx, qCtx, next)
+		return ExecChain(ctx, qCtx, next)
 	}
 
 	nextIdx := atomic.AddUint32(&lbn.p, 1) % uint32(len(lbn.branchNode))
-	qCtx.SetStatus(ExecChainNode(ctx, qCtx, lbn.branchNode[nextIdx]))
+	qCtx.SetStatus(ExecChain(ctx, qCtx, lbn.branchNode[nextIdx]))
 	return nil
 }

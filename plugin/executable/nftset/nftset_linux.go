@@ -95,7 +95,7 @@ func newNftsetPlugin(bp *coremain.BP, args *Args) (*nftsetPlugin, error) {
 // Exec tries to add all qCtx.R() IPs to system nftables.
 // If an error occurred, Exec will just log it.
 // Therefore, Exec will never raise its own error.
-func (p *nftsetPlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (p *nftsetPlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	r := qCtx.R()
 	if r != nil {
 		er := p.addElems(r)
@@ -104,7 +104,7 @@ func (p *nftsetPlugin) Exec(ctx context.Context, qCtx *query_context.Context, ne
 		}
 	}
 
-	return executable_seq.ExecChainNode(ctx, qCtx, next)
+	return executable_seq.ExecChain(ctx, qCtx, next)
 }
 
 func (p *nftsetPlugin) addElems(r *dns.Msg) error {

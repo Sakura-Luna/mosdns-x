@@ -62,7 +62,7 @@ func newIpsetPlugin(bp *coremain.BP, args *Args) (*ipsetPlugin, error) {
 	}, nil
 }
 
-func (p *ipsetPlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (p *ipsetPlugin) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	r := qCtx.R()
 	if r != nil {
 		er := p.addIPSet(r)
@@ -71,7 +71,7 @@ func (p *ipsetPlugin) Exec(ctx context.Context, qCtx *query_context.Context, nex
 		}
 	}
 
-	return executable_seq.ExecChainNode(ctx, qCtx, next)
+	return executable_seq.ExecChain(ctx, qCtx, next)
 }
 
 func (p *ipsetPlugin) Close() error {

@@ -41,7 +41,7 @@ type dummyNext struct {
 	latencyAAAA time.Duration
 }
 
-func (d *dummyNext) Exec(_ context.Context, qCtx *query_context.Context, _ executable_seq.ExecutableChainNode) error {
+func (d *dummyNext) Exec(_ context.Context, qCtx *query_context.Context, _ executable_seq.ExecChainNode) error {
 	q := qCtx.Q()
 	r := new(dns.Msg)
 	dnsutil.SetReply(r, q)
@@ -98,7 +98,7 @@ func TestSelector_Exec(t *testing.T) {
 		name      string
 		mode      int
 		qtype     uint16
-		next      executable_seq.ExecutableChainNode
+		next      executable_seq.ExecChainNode
 		wantErr   bool
 		wantReply bool
 	}{

@@ -33,7 +33,7 @@ import (
 const PluginType = "edns0_filter"
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 	coremain.RegNewPresetPluginFunc("_edns0_filter_no_edns0", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return NewFilter(bp, &Args{NoEDNS: true}), nil
 	})
@@ -60,7 +60,7 @@ type Filter struct {
 	discard map[uint16]struct{}
 }
 
-func Init(bp *coremain.BP, args interface{}) (p coremain.Plugin, err error) {
+func Init(bp *coremain.BP, args any) (p coremain.Plugin, err error) {
 	return NewFilter(bp, args.(*Args)), nil
 }
 
@@ -84,10 +84,10 @@ func NewFilter(bp *coremain.BP, args *Args) *Filter {
 	}
 }
 
-func (s *Filter) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (s *Filter) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	q := qCtx.Q()
 	s.applyFilter(q)
-	return executable_seq.ExecChainNode(ctx, qCtx, next)
+	return executable_seq.ExecChain(ctx, qCtx, next)
 }
 
 func (s *Filter) applyFilter(q *dns.Msg) {

@@ -60,7 +60,7 @@ type PadQuery struct {
 }
 
 // Exec pads queries to 128 octets as RFC 8467 recommended.
-func (p *PadQuery) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
+func (p *PadQuery) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
 	q := qCtx.Q()
 	if q.Len() <= 1152 {
 		dnsutils.RemoveEDNS0Option(q, dns.CodePADDING)
@@ -69,7 +69,7 @@ func (p *PadQuery) Exec(ctx context.Context, qCtx *query_context.Context, next e
 		dnsutils.PadToMinimum(q, maxPadLen)
 	}
 
-	if err := executable_seq.ExecChainNode(ctx, qCtx, next); err != nil {
+	if err := executable_seq.ExecChain(ctx, qCtx, next); err != nil {
 		return err
 	}
 	if r := qCtx.R(); r != nil {
@@ -92,8 +92,8 @@ type ResponsePaddingHandler struct {
 }
 
 // Exec pads responses to 468 octets as RFC 8467 recommended.
-func (h *ResponsePaddingHandler) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
-	if err := executable_seq.ExecChainNode(ctx, qCtx, next); err != nil {
+func (h *ResponsePaddingHandler) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecChainNode) error {
+	if err := executable_seq.ExecChain(ctx, qCtx, next); err != nil {
 		return err
 	}
 
