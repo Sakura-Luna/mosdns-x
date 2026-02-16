@@ -22,6 +22,7 @@ package doh3
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -37,10 +38,11 @@ import (
 type Upstream struct {
 	url       *url.URL
 	transport *http3.Transport
+	group     singleflight.Group
 }
 
 func NewUpstream(url *url.URL, transport *http3.Transport) *Upstream {
-	return &Upstream{url, transport}
+	return &Upstream{url: url, transport: transport}
 }
 
 func (u *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, error) {
@@ -55,16 +57,16 @@ func (u *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, e
 	}
 	C.MakeHeader(req)
 
-	var group singleflight.Group
 	res, err := u.transport.RoundTrip(req)
 	if err != nil {
 		if strings.HasSuffix(err.Error(), "0-RTT rejected") {
-			group.Do("refresh", func() (any, error) {
+			u.group.Do("refresh", func() (any, error) {
 				tlsConf := u.transport.TLSClientConfig.Clone()
 				tlsConf.ClientSessionCache = tls.NewLRUClientSessionCache(64)
 				u.transport.TLSClientConfig = tlsConf
 				return nil, nil
 			})
+			err = errors.New("tls cache expired")
 		}
 		return nil, err
 	}

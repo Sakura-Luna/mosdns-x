@@ -22,6 +22,7 @@ package dialer
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -29,10 +30,11 @@ import (
 )
 
 type SocksDialer struct {
-	dialer   *net.Dialer
-	addr     *SocksAddr
-	username string
-	password string
+	dialer    *net.Dialer
+	addr      *SocksAddr
+	username  string
+	password  string
+	plainAddr string
 }
 
 func newSocksDialer(dialer *net.Dialer, addr string, username string, password string) (*SocksDialer, error) {
@@ -47,10 +49,18 @@ func (d *SocksDialer) DialContext(ctx context.Context, network, addr string) (ne
 	if network != "tcp" && network != "udp" {
 		return nil, fmt.Errorf("unsupported network type: %s", network)
 	}
-	conn, err := d.dialer.DialContext(ctx, "tcp", d.addr.String())
+	var conn net.Conn
+	var err error
+	if d.plainAddr != "" {
+		conn, err = d.dialer.DialContext(ctx, network, d.plainAddr)
+	}
+	if _, ok := errors.AsType[*net.OpError](err); ok || conn == nil {
+		conn, err = d.dialer.DialContext(ctx, network, addr)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("dial failed: %v", err)
 	}
+	d.plainAddr = conn.RemoteAddr().String()
 	methods := []byte{MethodNoAuth}
 	if d.username != "" || d.password != "" {
 		methods = append(methods, MethodUserPass)

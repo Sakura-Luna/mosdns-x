@@ -21,6 +21,7 @@ package dialer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"syscall"
@@ -28,7 +29,8 @@ import (
 )
 
 type PlainDialer struct {
-	dialer *net.Dialer
+	dialer    *net.Dialer
+	plainAddr string
 }
 
 func newPlainDialer(dialer *net.Dialer) *PlainDialer {
@@ -39,10 +41,18 @@ func (d *PlainDialer) DialContext(ctx context.Context, network string, addr stri
 	if network != "tcp" && network != "udp" {
 		return nil, fmt.Errorf("unsupported network type: %s", network)
 	}
-	conn, err := d.dialer.DialContext(ctx, network, addr)
+	var conn net.Conn
+	var err error
+	if d.plainAddr != "" {
+		conn, err = d.dialer.DialContext(ctx, network, d.plainAddr)
+	}
+	if _, ok := errors.AsType[*net.OpError](err); ok || conn == nil {
+		conn, err = d.dialer.DialContext(ctx, network, addr)
+	}
 	if err != nil {
 		return nil, err
 	}
+	d.plainAddr = conn.RemoteAddr().String()
 	if network == "tcp" {
 		return conn, nil
 	}
